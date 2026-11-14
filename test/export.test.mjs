@@ -26,14 +26,15 @@ test("导出网页：数据和代码里的 </script> 都不会提前结束 scrip
     payload({ title: evil, charts: [{ id: "0", title: evil, source: evil, data: { pos: {}, theme: "card" } }] }),
     `var a = "${evil}"; var b = "</SCRIPT>"; // <!-- 注释`,
   );
-  // 整页里的 </script> 只能有两个：数据一个、代码一个，没有被里面的内容提前结束的
-  assert.equal((html.match(/<\/script/gi) ?? []).length, 2);
+  // 整页里的 </script> 只能有三个：数据一个、系统判断一个、代码一个，没有被里面的内容提前结束的
+  assert.equal((html.match(/<\/script/gi) ?? []).length, 3);
   // 数据：< 换成 <，读回来和原来一样
   const json = /<script type="application\/json" id="outline-flow-data">([\s\S]*?)<\/script>/.exec(html)[1];
   assert.ok(!json.includes("<"));
   assert.equal(JSON.parse(json).charts[0].source, evil);
-  // 代码：</script 变成 <\/script，原样还是同一段 JS
-  const code = /<script>([\s\S]*?)<\/script>/.exec(html)[1];
+  // 代码：</script 变成 <\/script，原样还是同一段 JS（最后一段脚本是查看器）
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  const code = scripts[scripts.length - 1][1];
   assert.ok(!/<\/script/i.test(code));
   assert.ok(code.includes("<\\/script>"));
   assert.ok(code.includes("<\\/SCRIPT>"));
@@ -49,6 +50,7 @@ test("导出网页：标题进 <title> 和 h1 时转义，页面信息行是图�
   assert.ok(html.startsWith("<!doctype html>"));
   // 深浅色靠样式里的 prefers-color-scheme，不用联网
   assert.ok(html.includes("prefers-color-scheme: dark"));
+  assert.ok(html.includes("<script>window.__outlineFlowIsMac=/Mac|iPhone|iPad/i.test(navigator.platform||navigator.userAgent);</script>"));
   assert.ok(!/<link\b|src="http|href="http/i.test(html));
 });
 

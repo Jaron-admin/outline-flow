@@ -53,7 +53,7 @@ export class Picker {
     const box = parent.createEl("span", { cls: "outline-flow-swatch" });
     for (const c of colors.slice(0, 5)) {
       const d = box.createEl("span");
-      d.style.background = c;
+      d.setCssStyles({ background: c });
     }
   }
 
@@ -93,10 +93,12 @@ export class Picker {
     // 位置：按钮正下方；最多用到图的底边，再长就在列表里滚
     const hb = this.host.getBoundingClientRect();
     const bb = this.button.getBoundingClientRect();
-    pop.style.left = bb.left - hb.left + "px";
-    pop.style.top = bb.bottom - hb.top + 4 + "px";
     const room = hb.bottom - bb.bottom - 12;
-    if (room > 120) pop.style.maxHeight = room + "px";
+    pop.setCssStyles({
+      left: bb.left - hb.left + "px",
+      top: bb.bottom - hb.top + 4 + "px",
+      ...(room > 120 ? { maxHeight: room + "px" } : {}),
+    });
     pop.querySelector(".is-current")?.scrollIntoView?.({ block: "nearest" });
     // 点别处、按 Esc 收起
     const away = (e: Event) => {

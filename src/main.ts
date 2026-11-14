@@ -155,7 +155,7 @@ export interface EditRequest {
 }
 export type EditOutcome = { ok: true } | { ok: false; reason: string };
 
-const isMac = () => /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+const isMac = () => Platform.isMacOS || Platform.isIosApp;
 const clonePos = (pos: Record<string, Point>): Record<string, Point> =>
   Object.fromEntries(Object.entries(pos).map(([k, v]) => [k, { x: v.x, y: v.y }]));
 const samePos = (a: Record<string, Point>, b: Record<string, Point>) => {
@@ -795,7 +795,7 @@ export class FlowView extends MarkdownRenderChild {
     // tabindex：图能拿到焦点，焦点在图上时按键和滚轮才归图管（见 onKey、onWheel）
     this.stage = root.createDiv({ cls: "outline-flow-stage", attr: { tabindex: "0" } });
     if (this.opts.fill) root.addClass("is-fill");
-    else this.stage.style.height = (readonly ? EXPORT_MIN_HEIGHT : this.plugin.settings.height) + "px"; // 只读的会在量出图的大小后重设
+    else this.stage.setCssStyles({ height: (readonly ? EXPORT_MIN_HEIGHT : this.plugin.settings.height) + "px" }); // 只读的会在量出图的大小后重设
     if (!readonly) {
       this.status = root.createDiv({ cls: "outline-flow-status" });
       this.keys = root.createDiv({ cls: "outline-flow-keys" });
@@ -949,7 +949,7 @@ export class FlowView extends MarkdownRenderChild {
     this.cy.on("mouseover", "node.link", (evt: any) => {
       const links: LinkInfo[] = evt.target.data("links") ?? [];
       // 插件里点一下是选中，不是打开，所以指针不变成手形，提示里写明怎么打开
-      if (readonly) this.stage.style.cursor = "pointer";
+      if (readonly) this.stage.setCssStyles({ cursor: "pointer" });
       const shown = links.map((l) => (l.kind === "note" ? t("link.note", { name: l.url }) : l.url)).join("  ·  ");
       this.linkTip.setText(readonly ? shown : t("link.openTip", { mod: isMac() ? "⌘" : "Ctrl", links: shown }));
       this.linkTip.show();
@@ -1138,7 +1138,7 @@ export class FlowView extends MarkdownRenderChild {
     const full = this.isFullscreen();
     this.containerEl.toggleClass("is-fill", full);
     this.fullBtn?.setText(full ? t("toolbar.exitFullscreen") : t("toolbar.fullscreen"));
-    if (full) this.stage.style.height = "";
+    if (full) this.stage.setCssStyles({ height: "" });
     else this.sizeToGraph();
     this.cy?.resize();
     this.fit();
@@ -1160,7 +1160,7 @@ export class FlowView extends MarkdownRenderChild {
     }
     const max = Math.max(EXPORT_MIN_HEIGHT, window.innerHeight * 0.8);
     const height = Math.round(Math.min(Math.max(want, EXPORT_MIN_HEIGHT), max));
-    if (this.stage.style.height !== height + "px") this.stage.style.height = height + "px";
+    if (this.stage.style.height !== height + "px") this.stage.setCssStyles({ height: height + "px" });
   }
 
   // ---------- 点节点打开网址 ----------
@@ -1209,8 +1209,7 @@ export class FlowView extends MarkdownRenderChild {
     const left = Math.max(gap, Math.min(at.x - menu.offsetWidth / 2, this.stage.clientWidth - menu.offsetWidth - gap));
     let top = at.y + half + gap;
     if (top + menu.offsetHeight > this.stage.clientHeight - gap) top = Math.max(gap, at.y - half - gap - menu.offsetHeight);
-    menu.style.left = left + "px";
-    menu.style.top = top + "px";
+    menu.setCssStyles({ left: left + "px", top: top + "px" });
   }
 
   private closeLinkMenu() {
@@ -1220,7 +1219,7 @@ export class FlowView extends MarkdownRenderChild {
 
   private resetLinkHover() {
     if (!this.stage) return;
-    this.stage.style.cursor = "";
+    this.stage.setCssStyles({ cursor: "" });
     this.linkTip?.hide();
   }
 
@@ -1565,16 +1564,17 @@ export class FlowView extends MarkdownRenderChild {
     const p = n.renderedPosition();
     const w = n.renderedOuterWidth();
     const h = n.renderedOuterHeight();
-    const s = st.input.style;
-    s.left = p.x - w / 2 + "px";
-    s.top = p.y - h / 2 + "px";
-    s.width = w + "px";
-    s.height = h + "px";
-    s.fontSize = parseFloat(n.style("font-size")) * z + "px";
-    s.fontFamily = n.style("font-family");
-    s.fontWeight = n.style("font-weight");
-    s.color = n.style("color");
-    s.padding = `0 ${parseFloat(n.style("padding")) * z}px`;
+    st.input.setCssStyles({
+      left: p.x - w / 2 + "px",
+      top: p.y - h / 2 + "px",
+      width: w + "px",
+      height: h + "px",
+      fontSize: parseFloat(n.style("font-size")) * z + "px",
+      fontFamily: n.style("font-family"),
+      fontWeight: n.style("font-weight"),
+      color: n.style("color"),
+      padding: `0 ${parseFloat(n.style("padding")) * z}px`,
+    });
   }
 
   /** 收掉输入框，返回正在输入的那一份状态；节点上的「正在输入」标记也去掉 */
@@ -1802,7 +1802,7 @@ export class FlowView extends MarkdownRenderChild {
   private applyTheme() {
     if (!this.cy) return;
     const font = safeFontFamily(getComputedStyle(document.body).fontFamily);
-    this.stage.style.background = THEMES[this.theme].stage;
+    this.stage.setCssStyles({ background: THEMES[this.theme].stage });
     this.cy.style(styleFor(this.theme, this.axis, font, this.line, this.structure));
     this.updateRefs();
     this.updateCurves();
@@ -1947,11 +1947,11 @@ export class FlowView extends MarkdownRenderChild {
     const pan = this.cy?.pan() ?? { x: 0, y: 0 };
     const z = this.cy?.zoom() ?? 1;
     if (r && r.vx !== null) {
-      this.guideV.style.left = r.vx * z + pan.x + "px";
+      this.guideV.setCssStyles({ left: r.vx * z + pan.x + "px" });
       this.guideV.show();
     } else this.guideV.hide();
     if (r && r.hy !== null) {
-      this.guideH.style.top = r.hy * z + pan.y + "px";
+      this.guideH.setCssStyles({ top: r.hy * z + pan.y + "px" });
       this.guideH.show();
     } else this.guideH.hide();
   }

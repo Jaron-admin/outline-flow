@@ -187,6 +187,7 @@ export function buildExportHtml(payload: ExportPayload, viewerCode: string): str
 <div id="${CHARTS_ID}"></div>
 </main>
 <script type="application/json" id="${DATA_ID}">${safeJson(payload)}</script>
+<script>window.__outlineFlowIsMac=/Mac|iPhone|iPad/i.test(navigator${"."}platform||navigator${"."}userAgent);</script>
 <script>${safeScript(viewerCode)}</script>
 </body>
 </html>

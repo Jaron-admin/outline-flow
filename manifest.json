@@ -1,8 +1,8 @@
 {
   "id": "outline-flow",
   "name": "Outline Flow",
-  "version": "1.0.2",
-  "minAppVersion": "1.5.0",
+  "version": "1.0.3",
+  "minAppVersion": "1.7.2",
   "description": "Draw outlines as mind maps or flowcharts, with back-links, loops drawn as polygons, summary braces and node notes. Edit on the chart and export a shareable HTML page.",
   "author": "Ti",
   "isDesktopOnly": false,

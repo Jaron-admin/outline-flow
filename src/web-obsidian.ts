@@ -175,11 +175,32 @@ proto.setAttr = function (this: HTMLElement, k: string, v: string) {
   this.setAttribute(k, v);
 };
 proto.show = function (this: HTMLElement) {
-  this.style.display = "";
+  this.style.removeProperty("display");
 };
 proto.hide = function (this: HTMLElement) {
-  this.style.display = "none";
+  this.style.setProperty("display", "none");
+};
+proto.setCssStyles = function (this: HTMLElement, styles: Record<string, string | number | null | undefined>) {
+  for (const [k, v] of Object.entries(styles)) {
+    if (v === null || v === undefined) continue;
+    // 键是驼峰写法（fontSize），要转成 CSS 的连字符写法（font-size）
+    this.style.setProperty(k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase()), String(v));
+  }
+};
+proto.setCssProps = function (this: HTMLElement, props: Record<string, string | number | null | undefined>) {
+  for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined) continue;
+    this.style.setProperty(k, String(v));
+  }
 };
 
-/** 网页里：当成电脑上用 */
-export const Platform = { isMobile: false, isMobileApp: false, isPhone: false, isDesktop: true, isDesktopApp: false };
+/** 网页里：当成电脑上用；是不是 Mac / iOS 由页面里那段内联脚本先算好 */
+export const Platform = {
+  isMobile: false,
+  isMobileApp: false,
+  isPhone: false,
+  isDesktop: true,
+  isDesktopApp: false,
+  isMacOS: (globalThis as any).__outlineFlowIsMac === true,
+  isIosApp: (globalThis as any).__outlineFlowIsMac === true,
+};
