@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><style>html,body{margin:0}#s{width:600px;height:600px}</style></head>
+<body>
+<div id="s"></div>
+<pre id="out">pending</pre>
+<script src="../node_modules/cytoscape/dist/cytoscape.min.js"></script>
+<script>
+// 量一下 segment-distances 的正值到底把线推到哪边：
+// 竖直方向（上→下）画一条线，带 +40 的偏移，看这条线的包围盒在原线左边还是右边。
+function probe(dy, d) {
+  const host = document.createElement("div");
+  host.style.cssText = "width:600px;height:600px;position:absolute;left:-9999px";
+  document.body.appendChild(host);
+  const cy = cytoscape({
+    container: host,
+    elements: [
+      { data: { id: "a" } }, { data: { id: "b" } }, { data: { id: "e", source: "a", target: "b" } },
+      { data: { id: "c" } }, { data: { id: "f", source: "a", target: "c" } },
+    ],
+    style: [
+      { selector: "node", style: { width: 10, height: 10, "background-color": "#000" } },
+      { selector: "edge", style: { width: 2, "curve-style": "segments", "segment-weights": 0.5, "segment-distances": d } },
+    ],
+  });
+  cy.getElementById("a").position({ x: 300, y: 300 });
+  cy.getElementById("b").position({ x: 300, y: 300 + dy });   // 竖直：上→下
+  cy.getElementById("c").position({ x: 300 + dy, y: 300 });   // 水平：左→右
+  const v = cy.getElementById("e").boundingBox();
+  const h = cy.getElementById("f").boundingBox();
+  const res = {
+    d,
+    "竖直上→下": { 线的x范围: [Math.round(v.x1 - 300), Math.round(v.x2 - 300)], 说明: v.x2 > 300 ? "推到屏幕右" : "推到屏幕左" },
+    "水平左→右": { 线的y范围: [Math.round(h.y1 - 300), Math.round(h.y2 - 300)], 说明: h.y1 < 300 ? "推到屏幕上" : "推到屏幕下" },
+  };
+  cy.destroy();
+  host.remove();
+  return res;
+}
+document.getElementById("out").textContent = JSON.stringify([probe(200, 40), probe(200, -40)], null, 1);
+</script>
+</body>
+</html>

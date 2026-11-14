@@ -1,0 +1,30 @@
+name: Release
+
+# 推一个版本标签（比如 1.0.1，和 manifest.json 里的版本一样）就自动构建、测试，并把三个文件挂到这个版本上
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Outline Flow $GITHUB_REF_NAME" \
+            dist/main.js dist/manifest.json dist/styles.css

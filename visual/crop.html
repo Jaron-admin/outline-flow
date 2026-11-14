@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:#fff}img{position:absolute;transform-origin:0 0}</style></head>
+<body>
+<img id="i">
+<script>
+const q = new URLSearchParams(location.search);
+const i = document.getElementById("i");
+i.src = "./shots/" + (q.get("f") ?? "flow-poly.png");
+const x = +(q.get("x") ?? 0), y = +(q.get("y") ?? 0), s = +(q.get("s") ?? 2);
+i.style.transform = `scale(${s}) translate(${-x}px, ${-y}px)`;
+</script>
+</body>
+</html>

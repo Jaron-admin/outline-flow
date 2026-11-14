@@ -1,0 +1,425 @@
+/* 插件自己的界面只用 Obsidian 的变量，跟着当前主题走。图内配色见 src/themes.ts。 */
+
+.outline-flow {
+  position: relative;
+  margin: var(--size-4-2) 0;
+}
+
+.outline-flow-stage {
+  width: 100%;
+  border-radius: var(--radius-m);
+  border: var(--border-width) solid var(--background-modifier-border);
+  overflow: hidden;
+  position: relative; /* 提示层要盖在画布上 */
+}
+
+/* 图拿到焦点（点过图）：四周描一圈强调色，提示现在滚轮是缩放、方向键和回车归图管。
+   画在一层盖在画布上面的伪元素上：画布本身会盖住容器自己的描边。 */
+.outline-flow-stage:focus {
+  outline: none;
+}
+
+.outline-flow-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.outline-flow.is-active .outline-flow-stage::after {
+  opacity: 1;
+}
+
+/* 「还没写内容」「写错了」：盖在画布中间，不占版面高度。
+   画布本身一直存在（不再按有无内容反复销毁重建），所以提示只能叠在上面。 */
+.outline-flow-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5; /* 在画布上面、工具条（z-index 10）下面 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--size-4-4);
+  text-align: center;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  pointer-events: none; /* 别挡住下面的拖动和缩放 */
+}
+
+.outline-flow-overlay.is-error {
+  color: var(--text-error);
+}
+
+.outline-flow-bar {
+  position: absolute;
+  top: var(--size-4-2);
+  left: var(--size-4-2);
+  right: var(--size-4-2);
+  pointer-events: none; /* 整条横跨画布，空的地方不挡拖动 */
+  z-index: 10; /* 在画布上面 */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+  opacity: 0;
+  transition: opacity 160ms;
+}
+
+.outline-flow:hover .outline-flow-bar,
+.outline-flow.is-active .outline-flow-bar,
+.outline-flow:focus-within .outline-flow-bar {
+  opacity: 1;
+}
+
+.outline-flow-bar > * {
+  pointer-events: auto;
+}
+
+/* 下拉在左，按钮推到右边 */
+.outline-flow-spacer {
+  flex: 1;
+  pointer-events: none !important;
+}
+
+.outline-flow-bar button,
+.outline-flow-bar select {
+  font-size: var(--font-ui-smaller);
+  height: auto;
+  padding: var(--size-2-2) var(--size-4-2);
+}
+
+.outline-flow-bar select {
+  padding-right: var(--size-4-6);
+}
+
+.outline-flow-status {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: var(--size-2-2) var(--size-2-1) 0;
+}
+
+/* 选中节点后图下面的按键提示 */
+.outline-flow-keys {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: var(--size-2-2) var(--size-2-1) 0;
+}
+
+/* 图里的小提示（已撤回……）：盖在画布上方中间，不挡操作 */
+.outline-flow-toast {
+  position: absolute;
+  top: var(--size-4-2);
+  left: 50%;
+  z-index: 11;
+  transform: translateX(-50%);
+  padding: var(--size-2-1) var(--size-4-3);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  background: var(--background-modifier-message);
+  border-radius: var(--radius-s);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 在图上改字的输入框：正好盖在节点上，大小和字号由代码按画面缩放算 */
+.outline-flow-stage input.outline-flow-input,
+.outline-flow-stage input.outline-flow-input:focus {
+  position: absolute;
+  z-index: 8;
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.outline-flow-message {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  padding: var(--size-4-3) var(--size-4-4);
+  border-radius: var(--radius-m);
+  border: var(--border-width) dashed var(--background-modifier-border);
+}
+
+.outline-flow-message.is-error {
+  color: var(--text-error);
+}
+
+@media (hover: none) {
+  .outline-flow-bar {
+    position: static;
+    opacity: 1;
+    margin-bottom: var(--size-4-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outline-flow-bar {
+    transition: none;
+  }
+}
+
+/* 侧栏面板：图撑满整个面板 */
+.outline-flow-side {
+  padding: var(--size-4-2);
+}
+
+.outline-flow-side-body,
+.outline-flow-side-body > div {
+  height: 100%;
+}
+
+.outline-flow.is-fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+}
+
+.outline-flow.is-fill .outline-flow-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 大纲里有写得不对的地方（比如 } 前面没有可括的节点）：状态行变色提醒 */
+/* 有问题的行：一条一行，黄色字，后面跟「去这一行」 */
+.outline-flow-warning {
+  display: block;
+  color: var(--text-warning);
+}
+
+.outline-flow-goto {
+  margin-left: var(--size-4-2);
+  color: var(--text-accent);
+  white-space: nowrap;
+}
+
+/* 点带网址的节点：悬停时图左下角显示地址；有几个地址就弹一个小菜单 */
+.outline-flow-linktip {
+  position: absolute;
+  left: var(--size-4-2);
+  bottom: var(--size-4-2);
+  z-index: 6;
+  max-width: 60%;
+  padding: var(--size-2-1) var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  overflow-wrap: anywhere;
+  pointer-events: none; /* 别挡住下面的节点 */
+}
+
+.outline-flow-linkmenu {
+  position: absolute;
+  z-index: 7;
+  min-width: 220px;
+  max-width: calc(100% - var(--size-4-4));
+  padding: var(--size-4-1);
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+}
+
+.outline-flow-linkmenu a {
+  display: block;
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.outline-flow-linkmenu a {
+  cursor: pointer; /* 双链没有 href，不写的话指针不会变手形 */
+}
+
+.outline-flow-linkmenu a:hover {
+  background: var(--background-modifier-hover);
+}
+
+.outline-flow-linkmenu small {
+  display: block;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* 导出的网页：一张图一张卡片，标题条在上，图在下 */
+.outline-flow-readonly {
+  margin: 0 0 var(--size-4-6);
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+
+.outline-flow-readonly.is-fill {
+  border-radius: 0;
+  border: 0;
+}
+
+.outline-flow-head {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-3) var(--size-4-4);
+  border-bottom: var(--border-width) solid var(--background-modifier-border);
+}
+
+.outline-flow-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  overflow-wrap: anywhere;
+}
+
+.outline-flow-head button {
+  flex: none;
+  padding: var(--size-2-1) var(--size-4-3);
+  font: inherit;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background: transparent;
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.outline-flow-head button:hover {
+  color: var(--text-normal);
+}
+
+.outline-flow-readonly .outline-flow-stage {
+  border: 0;
+  border-radius: 0;
+}
+
+.outline-flow-hint {
+  position: absolute;
+  right: var(--size-4-3);
+  bottom: var(--size-4-2);
+  z-index: 4;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ---------- 结构、主题的弹出菜单（picker.ts） ---------- */
+.outline-flow-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-3);
+}
+
+.outline-flow-picker-caret {
+  color: var(--text-faint);
+  font-size: 0.8em;
+}
+
+.outline-flow-picker.is-open {
+  background: var(--background-modifier-hover);
+}
+
+.outline-flow-picker-pop {
+  position: absolute;
+  z-index: 20; /* 在工具条上面 */
+  min-width: 180px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: var(--size-2-2);
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  font-size: var(--font-ui-small);
+}
+
+.outline-flow-picker-group {
+  padding: var(--size-2-3) var(--size-4-2) var(--size-2-1);
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.outline-flow-picker-group:not(:first-child) {
+  margin-top: var(--size-2-2);
+  border-top: var(--border-width) solid var(--background-modifier-border);
+}
+
+.outline-flow-picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-3) var(--size-4-2);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-normal);
+}
+
+.outline-flow-picker-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.outline-flow-picker-item.is-current {
+  color: var(--text-accent);
+  font-weight: var(--font-semibold);
+}
+
+/* 主题的代表色：一排小圆点 */
+.outline-flow-swatch {
+  display: inline-flex;
+  gap: 2px;
+  flex: none;
+}
+
+.outline-flow-swatch > span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+/* 开关按钮开着的样子（关联靠近） */
+.outline-flow-bar button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* 拖节点时的对齐参考线 */
+.outline-flow-guide {
+  position: absolute;
+  z-index: 8; /* 画布上面、焦点描边下面 */
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* 虚线：和图里的连线区分开 */
+.outline-flow-guide.is-v {
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--interactive-accent);
+}
+
+.outline-flow-guide.is-h {
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px dashed var(--interactive-accent);
+}
+
+/* 手机、平板上笔记里的代码块：图只用来看，手指的操作直接交给笔记滚动（拖、改去侧栏） */
+.outline-flow.is-touch-static .outline-flow-stage {
+  pointer-events: none;
+}
