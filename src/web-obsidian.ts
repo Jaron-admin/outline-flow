@@ -178,7 +178,7 @@ proto.show = function (this: HTMLElement) {
   this.style.removeProperty("display");
 };
 proto.hide = function (this: HTMLElement) {
-  this.style.setProperty("display", "none");
+  this.setCssStyles({ display: "none" });
 };
 proto.setCssStyles = function (this: HTMLElement, styles: Record<string, string | number | null | undefined>) {
   for (const [k, v] of Object.entries(styles)) {
