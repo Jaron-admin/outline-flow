@@ -4,6 +4,7 @@
 import type { ExportPayload } from "./export";
 import { FlowView } from "./main";
 import type { NoteData } from "./main";
+import { setLang } from "./i18n";
 import { CHARTS_ID, DATA_ID } from "./page-ids";
 import { DEFAULT_THEME, THEMES, themeForMode } from "./themes";
 
@@ -12,6 +13,8 @@ function start() {
   const host = document.getElementById(CHARTS_ID);
   if (!node || !host) return;
   const payload: ExportPayload = JSON.parse(node.textContent ?? "{}");
+  // 界面语言用导出时存的那个；老网页里没有这一项，按中文。要在建图之前设，按钮、提示、主题名都跟着它走
+  setLang(payload.lang ?? "zh");
 
   // 网页里没有 Obsidian 的插件对象：FlowView 要的那几个方法给空实现，设置和位置数据来自导出时存的那份
   const note: NoteData = { version: 1, diagrams: {} };

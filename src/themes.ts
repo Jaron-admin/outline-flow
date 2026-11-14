@@ -1,6 +1,8 @@
 // 流程图的主题与线型。每套主题只是一组取值，换主题不动结构和位置。
 // 这里是图内配色的唯一来源；插件自身的界面（工具条、设置）用 Obsidian 的变量，见 styles.css。
 
+import { t } from "./i18n";
+import type { Key } from "./i18n";
 import { labelSize } from "./pack";
 import { wrapCached } from "./wrap";
 
@@ -10,7 +12,6 @@ export type Direction = "LR" | "TB";
 export type Structure = "trunk" | "flow" | "logic" | "org" | "mindmap" | "radial" | "brace" | "timeline" | "fishbone";
 
 export interface Theme {
-  name: string;
   /** 画布的 CSS 背景 */
   stage: string;
   /** 画布底色，用来垫在线上文字的后面 */
@@ -42,7 +43,6 @@ const dots = (dot: string, bg: string) => `radial-gradient(${dot} 1px, transpare
 
 export const THEMES: Record<string, Theme> = {
   card: {
-    name: "浅色卡片",
     stage: "radial-gradient(#d5d9e2 1px, transparent 1px) 0 0 / 20px 20px, #f4f5f7",
     canvas: "#f4f5f7",
     node: { bg: "#ffffff", border: "#d9dde5", borderWidth: 1, text: "#1d2129", shape: "round-rectangle", shadow: "#0b122014" },
@@ -51,7 +51,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#9aa3b2", width: 1.5, round: true, label: "#4b5563" },
   },
   dark: {
-    name: "深色",
     stage: "radial-gradient(#2a2f3a 1px, transparent 1px) 0 0 / 20px 20px, #14171c",
     canvas: "#14171c",
     node: { bg: "#20252e", border: "#343b48", borderWidth: 1, text: "#e6e9ef", shape: "round-rectangle" },
@@ -60,7 +59,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#5c6676", width: 1.5, round: true, label: "#aab3c2" },
   },
   aurora: {
-    name: "极光",
     stage: "radial-gradient(#1b2133 1px, transparent 1px) 0 0 / 20px 20px, #0b0f19",
     canvas: "#0b0f19",
     node: {
@@ -76,7 +74,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#3b5578", width: 1.6, round: true, label: "#8fa6c4" },
   },
   neon: {
-    name: "霓虹",
     stage: "radial-gradient(#1d1630 1px, transparent 1px) 0 0 / 20px 20px, #08060f",
     canvas: "#08060f",
     node: {
@@ -93,7 +90,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#5a3f96", width: 1.8, round: true, label: "#b9a6ff" },
   },
   mint: {
-    name: "薄荷",
     stage: "radial-gradient(#cfe4d8 1px, transparent 1px) 0 0 / 20px 20px, #f2f8f4",
     canvas: "#f2f8f4",
     node: { bg: "#ffffff", border: "#cbe4d6", borderWidth: 1, text: "#1e3a2c", shape: "round-rectangle", shadow: "#0e3b2a12" },
@@ -102,7 +98,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#93bda9", width: 1.5, round: true, label: "#48705c" },
   },
   sunset: {
-    name: "日落",
     stage: "radial-gradient(#f6d9c4 1px, transparent 1px) 0 0 / 20px 20px, #fff8f1",
     canvas: "#fff8f1",
     node: {
@@ -119,7 +114,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#dda88c", width: 1.6, round: true, label: "#8a5540" },
   },
   paper: {
-    name: "手稿",
     stage: "radial-gradient(#dfd6bd 1px, transparent 1px) 0 0 / 20px 20px, #f8f4e9",
     canvas: "#f8f4e9",
     node: { bg: "#fffdf6", border: "#cbbd9a", borderWidth: 1, text: "#332c1f", shape: "rectangle" },
@@ -128,7 +122,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#9c9077", width: 1.4, round: false, label: "#6b6047" },
   },
   mono: {
-    name: "极简黑白",
     stage: "#ffffff",
     canvas: "#ffffff",
     node: { bg: "#ffffff", border: "#1a1a1a", borderWidth: 1.4, text: "#111111", shape: "rectangle" },
@@ -137,7 +130,6 @@ export const THEMES: Record<string, Theme> = {
     edge: { color: "#1a1a1a", width: 1.4, round: false, label: "#333333" },
   },
   yellow: {
-    name: "黄色重点",
     stage: "#e9e9e6",
     canvas: "#e9e9e6",
     node: { bg: "#ffffff", border: "#ffffff", borderWidth: 0, text: "#111111", shape: "round-rectangle" },
@@ -155,7 +147,6 @@ export const THEMES: Record<string, Theme> = {
  */
 const BRANCH_THEMES: Record<string, Theme> = {
   colorful: {
-    name: "缤纷",
     stage: dots("#eceef2", "#ffffff"),
     canvas: "#ffffff",
     node: { bg: "#ffffff", border: "#e3e6eb", borderWidth: 1, text: "#1f2329", shape: "round-rectangle" },
@@ -165,7 +156,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#ef5f5b", "#f39c32", "#2eae76", "#2f8cf0", "#7a63f0", "#e2559a"], level1: "fill" },
   },
   morandi: {
-    name: "莫兰迪",
     stage: dots("#e6e0d6", "#f5f2ed"),
     canvas: "#f5f2ed",
     node: { bg: "#fbf9f6", border: "#e2dbcf", borderWidth: 1, text: "#3d3833", shape: "round-rectangle" },
@@ -175,7 +165,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#b8736a", "#c39a57", "#87a07f", "#6d93a6", "#9587a8", "#a98a7c"], level1: "fill" },
   },
   fog: {
-    name: "雾蓝",
     stage: dots("#e2e8ef", "#f5f7fa"),
     canvas: "#f5f7fa",
     node: { bg: "#ffffff", border: "#dce3ec", borderWidth: 1, text: "#1e2733", shape: "round-rectangle" },
@@ -185,7 +174,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#2f5bea", "#22958a", "#6c5ce7", "#de7a3e", "#c4497b", "#3b8a58"], level1: "tint" },
   },
   plain: {
-    name: "素白",
     stage: "#ffffff",
     canvas: "#ffffff",
     node: { bg: "#ffffff", border: "#e4e4e7", borderWidth: 1, text: "#18181b", shape: "round-rectangle" },
@@ -195,7 +183,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#3f3f46"], level1: "tint" },
   },
   inkpaper: {
-    name: "纸墨",
     stage: dots("#e3d9c6", "#f3ede2"),
     canvas: "#f3ede2",
     node: { bg: "#fbf8f2", border: "#d9cdb8", borderWidth: 1, text: "#2b2722", shape: "round-rectangle" },
@@ -206,7 +193,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#b5443a", "#2f5d8c", "#4e7d5b", "#a8742f", "#6a5687", "#5b5852"], level1: "tint" },
   },
   night: {
-    name: "夜航",
     stage: dots("#1f242c", "#12151a"),
     canvas: "#12151a",
     node: { bg: "#1a1f27", border: "#2a313c", borderWidth: 1, text: "#e6eaf0", shape: "round-rectangle" },
@@ -216,7 +202,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#ff7b72", "#ffb454", "#4fd1a5", "#5cb8ff", "#a58cff", "#f48fc4"], level1: "tint" },
   },
   pine: {
-    name: "松烟",
     stage: dots("#1a2520", "#0f1714"),
     canvas: "#0f1714",
     node: { bg: "#16211c", border: "#24342c", borderWidth: 1, text: "#dce7e1", shape: "round-rectangle" },
@@ -226,7 +211,6 @@ const BRANCH_THEMES: Record<string, Theme> = {
     branches: { palette: ["#3fb68b", "#e3b25a", "#5fa8d3", "#e08a6e", "#a693e0", "#7fc8b4"], level1: "fill" },
   },
   print: {
-    name: "打印",
     stage: "#ffffff",
     canvas: "#ffffff",
     node: { bg: "#ffffff", border: "#111111", borderWidth: 1.2, text: "#111111", shape: "round-rectangle" },
@@ -239,16 +223,21 @@ const BRANCH_THEMES: Record<string, Theme> = {
 const SINGLE_KEYS = Object.keys(THEMES);
 Object.assign(THEMES, BRANCH_THEMES);
 
+/** 主题的名字：跟着当前语言走，显示时才取（不存在的 key 原样返回） */
+export function themeName(key: string): string {
+  return key in THEMES ? t(`theme.${key}` as Key) : key;
+}
+
 /** 主题菜单分两组：每个分支各一种颜色的、整张一种颜色的。色块取几种代表色 */
 export function themeGroups(): { title: string; items: { value: string; label: string; swatch: string[] }[] }[] {
   const item = (k: string) => {
-    const t = THEMES[k];
-    const swatch = t.branches ? [t.root.bg, ...t.branches.palette].slice(0, 5) : [t.root.grad?.[0] ?? t.root.bg, t.node.border, t.edge.color];
-    return { value: k, label: t.name, swatch };
+    const th = THEMES[k];
+    const swatch = th.branches ? [th.root.bg, ...th.branches.palette].slice(0, 5) : [th.root.grad?.[0] ?? th.root.bg, th.node.border, th.edge.color];
+    return { value: k, label: themeName(k), swatch };
   };
   return [
-    { title: "分支配色", items: Object.keys(BRANCH_THEMES).map(item) },
-    { title: "单色", items: SINGLE_KEYS.map(item) },
+    { title: t("themeGroup.branch"), items: Object.keys(BRANCH_THEMES).map(item) },
+    { title: t("themeGroup.single"), items: SINGLE_KEYS.map(item) },
   ];
 }
 
@@ -298,31 +287,23 @@ export function themeForMode(themeKey: string, dark: boolean): string {
   return dark ? "dark" : "card";
 }
 
-export const DIRECTIONS: Record<Direction, string> = {
-  LR: "从左到右",
-  TB: "从上到下",
-};
+/** 方向的名字（跟着当前语言走） */
+export function directionName(d: Direction): string {
+  return t(`direction.${d}` as Key);
+}
 
-/** 菜单里能选的结构。每种的方向、线型都定死、调好，不再单独选 */
-export const STRUCTURES: Partial<Record<Structure, string>> = {
-  mindmap: "思维导图",
-  logic: "逻辑图",
-  org: "组织结构图",
-  radial: "放射图",
-};
+/** 菜单里能选的结构，按菜单里的顺序。每种的方向、线型都定死、调好，不再单独选 */
+export const STRUCTURES: readonly Structure[] = ["mindmap", "logic", "org", "radial"];
 
-/** 所有结构的名字，包括归档的（菜单里不显示，旧数据里可能还存着） */
-export const ALL_STRUCTURES: Record<Structure, string> = {
-  mindmap: "思维导图",
-  logic: "逻辑图",
-  org: "组织结构图",
-  radial: "放射图",
-  trunk: "主干图",
-  flow: "流程图",
-  brace: "括号图",
-  timeline: "时间轴",
-  fishbone: "鱼骨图",
-};
+/** 结构的名字，包括归档的（菜单里不显示，旧数据里可能还存着）。跟着当前语言走，显示时才取 */
+export function structureName(s: Structure): string {
+  return t(`structure.${s}` as Key);
+}
+
+/** 菜单、设置里的结构选项：值和当前语言的名字 */
+export function structureOptions(): { value: Structure; label: string }[] {
+  return STRUCTURES.map((value) => ({ value, label: structureName(value) }));
+}
 
 export const DEFAULT_STRUCTURE: Structure = "mindmap";
 
@@ -331,7 +312,7 @@ export const DEFAULT_STRUCTURE: Structure = "mindmap";
  * 以前存成这些的图按思维导图画，存着的设置不去改它，哪天放出来还能接着用。
  */
 export function liveStructure(s: string | undefined | null): Structure {
-  return s && s in STRUCTURES ? (s as Structure) : DEFAULT_STRUCTURE;
+  return s && (STRUCTURES as readonly string[]).includes(s) ? (s as Structure) : DEFAULT_STRUCTURE;
 }
 
 /** 每种结构固定用的线：思维导图用弧线，放射图用直线，逻辑图、组织结构图用圆角折线 */
@@ -358,11 +339,10 @@ export function axisFor(structure: Structure, dir: Direction): Direction {
 
 /** 线型：折线横平竖直；直线就是直的；弧线是真正弯的贝塞尔 */
 export type LineMode = "poly" | "straight" | "curve";
-export const LINE_MODES: Record<LineMode, string> = {
-  poly: "折线",
-  straight: "直线",
-  curve: "弧线",
-};
+/** 线型的名字（跟着当前语言走） */
+export function lineModeName(m: LineMode): string {
+  return t(`line.${m}` as Key);
+}
 
 /** 拖完节点吸附用的小格子。附近有别的节点时优先和它对齐，见主程序的 snapPoint */
 export const GRID = 20;

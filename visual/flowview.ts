@@ -4,6 +4,7 @@ import { TFile } from "obsidian";
 import OutlineFlowPlugin, { FlowView } from "../src/main";
 import { extractOutlineFromMarkdown } from "../src/graph";
 import { applyEdit } from "../src/edit";
+import { setLang, getLang } from "../src/i18n";
 
 const results: string[] = [];
 const ok = (name: string, cond: boolean, extra = "") => {
@@ -829,6 +830,54 @@ try {
     await sleep(0);
     ok("写笔记：标题 Delete 删整节，正文段落留着（它不属于大纲，但在这一节里，整节一起删）", !vaultText.includes("订单"), JSON.stringify(vaultText));
     view.unload();
+  }
+
+  // 8z. 界面语言：切到英文再建图，工具条、选择器、提示、只读标题条都是英文；切回中文后又是中文
+  {
+    const own = (src: string, readonly = false) => {
+      const el = document.createElement("div");
+      host.appendChild(el);
+      const v: any = new FlowView(el, plugin, src, readonly ? null : "lang.md", "0", { version: 1, diagrams: {} } as any, readonly ? { readonly: true, title: "t" } : {});
+      v.load();
+      return { v, el };
+    };
+    const btnTexts = (el: HTMLElement, sel = ".outline-flow-bar button") => Array.from(el.querySelectorAll(sel)).map((b) => b.textContent ?? "");
+    const pickers = (el: HTMLElement) => Array.from(el.querySelectorAll(".outline-flow-picker")).map((b) => `${b.getAttribute("aria-label")}=${(b.textContent ?? "").replace("▾", "")}`);
+    const src = "根\n  甲【备注】\n    甲1\n  乙\n    乙1: (甲1)\n";
+    ok("语言：默认是中文", getLang() === "zh");
+    setLang("en");
+    try {
+      const E = own(src);
+      const texts = btnTexts(E.el);
+      for (const want of ["Hide notes", "Group related", "Snap", "Re-layout", "Copy as Flowchart Fun", "Export web page"]) {
+        ok(`语言 en：工具条有「${want}」`, texts.includes(want), texts.join(" | "));
+      }
+      ok("语言 en：工具条上没有中文", !texts.some((t) => /[\u3400-\u9fff]/.test(t)), texts.join(" | "));
+      const pk = pickers(E.el);
+      ok("语言 en：结构选择器显示 Logic chart（测试设置里是逻辑图）", pk.includes("Structure=Logic chart"), pk.join(" | "));
+      ok("语言 en：主题选择器显示 Light Card", pk.includes("Theme=Light Card"), pk.join(" | "));
+      const status = E.el.querySelector(".outline-flow-status")?.textContent ?? "";
+      ok("语言 en：状态行是英文", /nodes, positions are automatic\./.test(status) && !/[\u3400-\u9fff]/.test(status), status);
+      cyOf(E.v).nodes().not(".note").first().emit("tap");
+      const keys = E.el.querySelector(".outline-flow-keys")?.textContent ?? "";
+      ok("语言 en：选中节点后的按键提示是英文", /^Enter: add sibling · Tab: add child · ⇧Tab: promote · Space: edit text · Delete: remove · (⌘Z|Ctrl\+Z): undo · (⌘|Ctrl)\+click: open link/.test(keys), keys);
+      E.v.update("");
+      ok("语言 en：空内容提示是英文", overlayText(E.el) === "Write a line in the code block and a node will appear here.", overlayText(E.el));
+      E.v.unload();
+      const R = own(src, true);
+      const heads = btnTexts(R.el, ".outline-flow-head button");
+      ok("语言 en：只读标题条按钮是 Fit / Full screen", heads.join() === "Fit,Full screen", heads.join());
+      const rhint = R.el.querySelector(".outline-flow-hint")?.textContent ?? "";
+      ok("语言 en：只读右下角的操作提示是英文", /^Drag to pan · Hold (⌘|Ctrl) and scroll to zoom$/.test(rhint), rhint);
+      R.v.unload();
+    } finally {
+      setLang("zh");
+    }
+    const Z = own(src);
+    const zt = btnTexts(Z.el);
+    ok("语言：切回中文后工具条又是中文", zt.includes("重新自动排版") && zt.includes("吸附") && !zt.includes("Snap"), zt.join(" | "));
+    ok("语言：切回中文后选择器是中文", pickers(Z.el).includes("结构=逻辑图"), pickers(Z.el).join(" | "));
+    Z.v.unload();
   }
 
   // 9. 卸载：用独立实例测，别把主图销毁了（截图还要看它）

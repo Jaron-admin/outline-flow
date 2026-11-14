@@ -7,6 +7,7 @@
 // 行号一律是笔记里的行号（从 0 数）；图上节点自己带的行号是图的源文本里的行号（从 1 数），
 // 两者的对应见 diagramSource。
 
+import { t as tr } from "./i18n";
 import { HEADING, extractOutlineMap, findFlowBlocks, indentWidth, normalizeOutline } from "./graph";
 
 export type Target = { mode: "outline" } | { mode: "block"; index: number };
@@ -39,8 +40,8 @@ export interface EditNo {
 }
 export type EditResult = EditOk | EditNo;
 
-export const REMOVED_SECTION_NOTICE = "删掉了整节，⌘Z 可以撤回";
-const TOP_LEVEL = "已经是最上面一级了";
+/** 删掉整节后给用户看的一句话（跟着当前语言走，用的时候才取） */
+export const removedSectionNotice = () => tr("edit.removedSection");
 
 const no = (reason: string): EditNo => ({ ok: false, reason });
 
@@ -349,9 +350,9 @@ export function setNodeText(text: string, target: Target, line: number, newText:
   return run(text, (t) => {
     const m = buildModel(t, target);
     const i = m?.byLine.get(line);
-    if (!m || i === undefined) return no("这个节点在笔记里找不到对应的行");
+    if (!m || i === undefined) return no(tr("edit.noRow"));
     const value = oneLine(newText);
-    if (!value) return no("字不能是空的");
+    if (!value) return no(tr("edit.emptyText"));
     const p = partsOf(m, i);
     if (value === p.text) return { ok: true, text: t, line };
     m.lines[line] = p.prefix + p.head + value + p.tail;
@@ -364,11 +365,11 @@ export function addSibling(text: string, target: Target, line: number, newText: 
   return run(text, (t) => {
     const m = buildModel(t, target);
     const i = m?.byLine.get(line);
-    if (!m || i === undefined) return no("这个节点在笔记里找不到对应的行");
+    if (!m || i === undefined) return no(tr("edit.noRow"));
     const value = oneLine(newText);
-    if (!value) return no("字不能是空的");
+    if (!value) return no(tr("edit.emptyText"));
     const r = m.rows[i];
-    if (m.mode === "block" && m.hasHeading) return no("代码块里有 # 标题，层级没法直接加，请在笔记里改");
+    if (m.mode === "block" && m.hasHeading) return no(tr("edit.headingInBlockAdd"));
     if (r.kind === "heading") {
       // 同级标题：放在这一整节后面。上一行不是空行就先补一个空行
       const at = trimBlank(m, r.line, sectionEnd(m, i) - 1);
@@ -387,11 +388,11 @@ export function addChild(text: string, target: Target, line: number, newText: st
   return run(text, (t) => {
     const m = buildModel(t, target);
     const i = m?.byLine.get(line);
-    if (!m || i === undefined) return no("这个节点在笔记里找不到对应的行");
+    if (!m || i === undefined) return no(tr("edit.noRow"));
     const value = oneLine(newText);
-    if (!value) return no("字不能是空的");
+    if (!value) return no(tr("edit.emptyText"));
     const r = m.rows[i];
-    if (m.mode === "block" && m.hasHeading) return no("代码块里有 # 标题，层级没法直接加，请在笔记里改");
+    if (m.mode === "block" && m.hasHeading) return no(tr("edit.headingInBlockAdd"));
     if (r.kind === "heading") {
       // 标题下面加列表项：放在标题自己的内容末尾、第一个小标题之前；上一行不是列表就先补一个空行
       const end = directEnd(m, i);
@@ -421,11 +422,11 @@ export function promote(text: string, target: Target, line: number): EditResult 
   return run(text, (t) => {
     const m = buildModel(t, target);
     const i = m?.byLine.get(line);
-    if (!m || i === undefined) return no("这个节点在笔记里找不到对应的行");
+    if (!m || i === undefined) return no(tr("edit.noRow"));
     const r = m.rows[i];
-    if (m.mode === "block" && m.hasHeading) return no("代码块里有 # 标题，层级没法直接改，请在笔记里改");
-    if (r.kind === "heading") return no("标题不能提一级，请在笔记里改 # 的个数");
-    if (r.parent < 0 || m.rows[r.parent].kind === "heading") return no(TOP_LEVEL);
+    if (m.mode === "block" && m.hasHeading) return no(tr("edit.headingInBlockEdit"));
+    if (r.kind === "heading") return no(tr("edit.promoteHeading"));
+    if (r.parent < 0 || m.rows[r.parent].kind === "heading") return no(tr("edit.topLevel"));
     const p = m.rows[r.parent];
     const last = lastLineOf(m, i);
     const moved = m.lines.splice(r.line, last - r.line + 1);
@@ -443,9 +444,9 @@ export function removeNode(text: string, target: Target, line: number): EditResu
   return run(text, (t) => {
     const m = buildModel(t, target);
     const i = m?.byLine.get(line);
-    if (!m || i === undefined) return no("这个节点在笔记里找不到对应的行");
+    if (!m || i === undefined) return no(tr("edit.noRow"));
     const r = m.rows[i];
-    if (m.mode === "block" && m.hasHeading) return no("代码块里有 # 标题，层级没法直接改，请在笔记里改");
+    if (m.mode === "block" && m.hasHeading) return no(tr("edit.headingInBlockEdit"));
     const isSection = r.kind === "heading";
     let start = r.line;
     const end = isSection ? sectionEnd(m, i) : lastLineOf(m, i) + 1; // 不含
@@ -463,7 +464,7 @@ export function removeNode(text: string, target: Target, line: number): EditResu
     if (next !== undefined) pick = m.rows[next].line - removed;
     else if (prev !== undefined) pick = m.rows[prev].line;
     else if (r.parent >= 0) pick = m.rows[r.parent].line;
-    return { ok: true, text: join(m.lines), line: pick, ...(isSection ? { notice: REMOVED_SECTION_NOTICE } : {}) };
+    return { ok: true, text: join(m.lines), line: pick, ...(isSection ? { notice: removedSectionNotice() } : {}) };
   });
 }
 
@@ -496,10 +497,10 @@ export interface Applied {
  */
 export function applyEdit(text: string, target: Target, source: string, op: EditOp): Applied | EditNo {
   const ds = diagramSource(text, target);
-  if (!ds) return no("笔记里找不到这张图了");
-  if (norm(ds.source) !== norm(source)) return no("笔记刚刚变了，图还没跟上，稍等一下再试");
+  if (!ds) return no(tr("edit.diagramGone"));
+  if (norm(ds.source) !== norm(source)) return no(tr("edit.noteChanged"));
   const line = ds.lines[op.line - 1];
-  if (line === undefined) return no("这个节点在笔记里找不到对应的行");
+  if (line === undefined) return no(tr("edit.noRow"));
   let r: EditResult;
   switch (op.kind) {
     case "setText":

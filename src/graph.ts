@@ -1,4 +1,5 @@
 import { parse } from "graph-selector";
+import { t as tr } from "./i18n";
 import type { Structure } from "./themes";
 
 export interface FlowElement {
@@ -54,7 +55,7 @@ export function toFlowchartFun(text: string): string {
       .map((line) => line.replace(/^\s+/, (ws) => ws.replace(/\t/g, "  ")))
       .map((line) => {
         const sum = parseSummary(line);
-        if (sum) return `${sum.indent}// ${sum.text || (sum.count ? `概要前 ${sum.count} 项` : "概要")}`;
+        if (sum) return `${sum.indent}// ${sum.text || (sum.count ? tr("summary.previous", { count: sum.count }) : tr("summary.plain"))}`;
         return escapeFullwidthParens(line);
       })
       .join("\n")
@@ -174,16 +175,16 @@ export function plainWhereObvious(line: string): string {
 function reasonOf(code: string | undefined): string {
   switch (code) {
     case "EDGE_LABEL_WITHOUT_PARENT":
-      return "最外层的行里有「冒号+空格」，流程图会把冒号前面当成线上的字，可这一行没有上一级";
+      return tr("warn.reason.edgeLabelNoParent");
     case "MULTIPLE_POINTERS_ON_SAME_LINE":
     case "NODE_AND_POINTER_ON_SAME_LINE":
     case "POINTER_AND_CONTAINER_ON_SAME_LINE":
-      return "半角括号 ( ) 在流程图里是「连回某个节点」，和这一行的其他字放在一起读不通";
+      return tr("warn.reason.pointer");
     case "DUPLICATE_NODE_ID":
     case "DUPLICATE_EDGE_ID":
-      return "#名字 在流程图里是节点编号，和前面的重复了";
+      return tr("warn.reason.duplicateId");
     default:
-      return "这一行的写法流程图读不懂";
+      return tr("warn.reason.default");
   }
 }
 
@@ -421,7 +422,7 @@ export function buildElements(
     return plainWhereObvious(escapeFullwidthParens(md.text));
   });
   if (flat && lines.some((l) => parseSummary(l))) {
-    warn(0, "时间轴、鱼骨图和发散图没有地方画大括号，} 那几行先不显示。");
+    warn(0, tr("warn.flatBrace"));
   }
   // 某一行写法读不通时，不让整张图出不来：把那一行的特殊字全部当成普通字，再读一遍，并告诉用户是哪一行
   let graph: ReturnType<typeof parse>;
@@ -442,7 +443,7 @@ export function buildElements(
       const snippet = shown.length > 24 ? shown.slice(0, 24) + "…" : shown;
       warnings.push({
         group: "warnings",
-        data: { id: "warning-" + at + "-" + warnings.length, line: at, find: shown, text: `「${snippet}」这一行：${reasonOf(e?.code)}。图上先按原文显示。` },
+        data: { id: "warning-" + at + "-" + warnings.length, line: at, find: shown, text: tr("warn.line", { snippet, reason: reasonOf(e?.code) }) },
         classes: "",
       });
     }
@@ -504,7 +505,7 @@ export function buildElements(
       }
       const covered = sum.count > 0 ? run.slice(-sum.count) : run;
       if (covered.length === 0) {
-        warn(n.data.line, `第 ${n.data.line} 行的 } 前面没有可以括的节点。它要和被括的那几行缩进一样、写在它们后面。`);
+        warn(n.data.line, tr("warn.braceNothing", { line: n.data.line as number }));
         if (sum.ghost) n.data.label = "}";
         run.push(n);
         continue;

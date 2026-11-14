@@ -48,7 +48,11 @@ Works on phones and tablets. Charts inside code blocks are view-only on touch sc
 
 ## Data
 
-Node positions are stored as JSON files in a vault folder (`流程图位置` by default, configurable). Nothing is sent over the network.
+Node positions are stored as JSON files in a vault folder (`Outline Flow positions` by default, configurable in settings). Nothing is sent over the network.
+
+## Language
+
+The interface follows Obsidian's language: Chinese when Obsidian is set to Chinese, English otherwise.
 
 ## License
 
@@ -81,6 +85,10 @@ GPL-3.0. Third-party libraries: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES
 ### 数据
 
 拖过的位置存在库里的 `流程图位置` 文件夹（设置里可以改），一篇笔记一个 JSON 文件。不联网，不上传任何东西。
+
+### 语言
+
+界面跟着 Obsidian 的语言走：Obsidian 设成中文就是中文，其他语言显示英文。
 
 ### 许可
 

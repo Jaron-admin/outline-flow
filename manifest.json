@@ -1,7 +1,7 @@
 {
   "id": "outline-flow",
   "name": "Outline Flow",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.5.0",
   "description": "Turn indented outlines into mind maps and flowcharts. Edit on the chart with Enter and Tab, pick from 17 themes, drag with snapping, and export to a single HTML page.",
   "author": "Ti",

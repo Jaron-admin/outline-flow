@@ -1,6 +1,7 @@
 // 把一篇笔记里的流程图导成一个单文件网页。
 // 这里只管「拼出网页文字」和「从笔记里找出要导出的图」，都是纯函数；读写文件在 main.ts 的 exportNote。
 import stageCss from "../styles.css";
+import { Lang, getLang, t } from "./i18n";
 import { CHARTS_ID, DATA_ID } from "./page-ids";
 import { HEADING, extractOutlineFromMarkdown, findFlowBlocks, inlineMarkdown } from "./graph";
 import type { DiagramData, Settings } from "./main";
@@ -19,6 +20,8 @@ export interface ExportPayload {
   date: string;
   charts: ExportChart[];
   settings: Pick<Settings, "theme" | "direction" | "line" | "structure" | "snap" | "height">;
+  /** 导出时的界面语言：网页的 lang、日期那行、按钮、提示都用它。老数据没有这一项，按中文 */
+  lang?: Lang;
   /** 主题照存的用，不跟着看的人的系统深浅色换（挑主题的预览页用） */
   fixedTheme?: boolean;
 }
@@ -63,7 +66,7 @@ export function collectCharts(markdown: string, noteTitle: string): { id: string
   });
   return blocks.map((b) => ({
     id: String(b.index),
-    title: headingAt[b.start] ?? `图 ${b.index + 1}`,
+    title: headingAt[b.start] ?? t("export.chartN", { n: b.index + 1 }),
     source: b.source,
   }));
 }
@@ -104,7 +107,7 @@ const PAGE_CSS = `
   }
 }
 :root {
-  /* styles.css 里用的 Obsidian 变量，映射到上面的颜色 */
+  /* Obsidian variables used by styles.css, mapped to the colors above */
   --background-primary: var(--card);
   --background-secondary: var(--page);
   --background-modifier-border: var(--line);
@@ -165,8 +168,11 @@ function safeScript(code: string): string {
  */
 export function buildExportHtml(payload: ExportPayload, viewerCode: string): string {
   const title = escapeHtml(payload.title);
+  const lang = payload.lang ?? getLang();
+  const n = payload.charts.length;
+  const meta = escapeHtml(t(n === 1 ? "export.metaOne" : "export.meta", { n, date: payload.date }, lang));
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="${lang === "zh" ? "zh-CN" : "en"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -177,7 +183,7 @@ export function buildExportHtml(payload: ExportPayload, viewerCode: string): str
 <body>
 <main>
 <h1>${title}</h1>
-<div class="meta">${payload.charts.length} 张流程图 · ${escapeHtml(payload.date)} 导出</div>
+<div class="meta">${meta}</div>
 <div id="${CHARTS_ID}"></div>
 </main>
 <script type="application/json" id="${DATA_ID}">${safeJson(payload)}</script>

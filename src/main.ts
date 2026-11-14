@@ -14,11 +14,13 @@ import {
   normalizePath,
   Platform,
 } from "obsidian";
+import * as obsidian from "obsidian";
 import cytoscape from "cytoscape";
 import { BraceSpec, addBraces, bracesFrom, placeBraces } from "./brace";
 import { applyCurves } from "./curve";
 import { routeFish } from "./fish";
 import { routeRadial } from "./radial";
+import { LEGACY_FOLDER, detectLang, getLang, setLang, t } from "./i18n";
 import { Picker } from "./picker";
 import { snapTo } from "./snap";
 import { assignBranches } from "./branch";
@@ -35,21 +37,23 @@ import {
   Direction,
   GRID,
   LineMode,
-  STRUCTURES,
   Structure,
   THEMES,
   axisFor,
   followsDirection,
   lineFor,
   liveStructure,
+  structureName,
+  structureOptions,
   themeGroups,
+  themeName,
   styleFor,
 } from "./themes";
 import { WheelKind, wheelAction, wheelKind } from "./wheel";
 
 const SIDE_VIEW = "outline-flow-side";
-/** 导出的网页放在库里的这个文件夹 */
-const EXPORT_FOLDER = "流程图网页";
+/** 导出的网页放在库里的这个文件夹（名字跟着界面语言走，用的时候才取） */
+const exportFolder = () => t("export.folder");
 /** 导出的网页里，图的高度不会低于这个值（像素） */
 const EXPORT_MIN_HEIGHT = 240;
 const MIN_HEIGHT = 200;
@@ -68,7 +72,7 @@ export interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  folder: "流程图位置",
+  folder: LEGACY_FOLDER, // 老版本的默认值；新装的按语言选，见 onload
   theme: DEFAULT_THEME,
   direction: "LR",
   line: "poly",
@@ -320,9 +324,9 @@ export default class OutlineFlowPlugin extends Plugin {
       selBefore = diagramSource(cur, target)?.lines[req.op.line - 1] ?? null;
       return r.text;
     });
-    if (done === "missing") return { ok: false, reason: "找不到这篇笔记" };
+    if (done === "missing") return { ok: false, reason: t("edit.noteNotFound") };
     const a = applied as Applied | null;
-    if (!a) return { ok: false, reason: failure || "这一步没做成" };
+    if (!a) return { ok: false, reason: failure || t("edit.failed") };
     if (!done) return { ok: true }; // 改完和原来一样，什么都没动
     const key = this.viewportKey(req.notePath, req.diagramId);
     this.pushHistory(key, { kind: "text", before: done.before, after: done.after, selBefore, selAfter: a.line });
@@ -334,7 +338,7 @@ export default class OutlineFlowPlugin extends Plugin {
   /** 先不写笔记，算出改完以后图的源文本和新节点在第几行：加节点时先按这个排一遍，节点直接出现在它最终的位置 */
   async previewEdit(req: EditRequest): Promise<{ ok: true; source: string; srcLine: number | null } | { ok: false; reason: string }> {
     const text = await this.readNoteText(req.notePath);
-    if (text === null) return { ok: false, reason: "找不到这篇笔记" };
+    if (text === null) return { ok: false, reason: t("edit.noteNotFound") };
     const r = applyEdit(text, targetOf(req.diagramId), req.source, req.op);
     if (!r.ok) return r;
     return { ok: true, source: r.source, srcLine: r.srcLine };
@@ -355,10 +359,10 @@ export default class OutlineFlowPlugin extends Plugin {
     const to = dir === "undo" ? entry.before : entry.after;
     const done = await this.writeNote(notePath, (cur) => (cur === from ? to : null));
     if (!done) {
-      new Notice(dir === "undo" ? "笔记在别处改过了，这一步撤回不了" : "笔记在别处改过了，这一步重做不了");
+      new Notice(dir === "undo" ? t("undo.conflict") : t("redo.conflict"));
       return false;
     }
-    this.setPending(this.viewportKey(notePath, diagramId), to, diagramId, dir === "undo" ? entry.selBefore : entry.selAfter, dir === "undo" ? "已撤回" : "已重做");
+    this.setPending(this.viewportKey(notePath, diagramId), to, diagramId, dir === "undo" ? entry.selBefore : entry.selAfter, dir === "undo" ? t("toast.undone") : t("toast.redone"));
     return true;
   }
 
@@ -378,19 +382,34 @@ export default class OutlineFlowPlugin extends Plugin {
   }
 
   async onload() {
-    this.settings = { ...DEFAULTS, ...((await this.loadData()) ?? {}) };
+    // 先定界面语言：后面注册的命令名、侧栏提示、设置页都要用对的语言
+    setLang(detectLang(obsidian));
+    const saved = await this.loadData();
+    this.settings = { ...DEFAULTS, ...(saved ?? {}) };
     if (!THEMES[this.settings.theme]) this.settings.theme = DEFAULT_THEME;
+    if (saved == null) {
+      // 全新安装（一份设置都没存过）：位置文件夹按语言取个名字并存下来，以后切换语言也不会变。
+      // 存过设置的老用户不动。没存过设置、但库里已经有老版本的默认文件夹的，继续用它，位置才不会丢。
+      let folder = t("settings.folder.default");
+      try {
+        if (folder !== LEGACY_FOLDER && (await this.app.vault.adapter.exists(LEGACY_FOLDER))) folder = LEGACY_FOLDER;
+      } catch {
+        // 查不了就用按语言取的名字
+      }
+      this.settings.folder = folder;
+      await this.saveSettings();
+    }
 
     this.registerMarkdownCodeBlockProcessor(BLOCK_LANG, (source, el, ctx) => this.render(source, el, ctx));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.onRename(file, oldPath)));
     this.addSettingTab(new OutlineFlowSettingTab(this.app, this));
 
     this.registerView(SIDE_VIEW, (leaf) => new SideView(leaf, this));
-    this.addRibbonIcon("workflow", "在侧栏显示流程图", () => void this.openSide());
-    this.addCommand({ id: "open-side", name: "在侧栏显示流程图", callback: () => void this.openSide() });
+    this.addRibbonIcon("workflow", t("command.openSide"), () => void this.openSide());
+    this.addCommand({ id: "open-side", name: t("command.openSide"), callback: () => void this.openSide() });
     this.addCommand({
       id: "export-html",
-      name: "导出为网页",
+      name: t("command.exportHtml"),
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
         if (!file || file.extension !== "md") return false;
@@ -401,23 +420,23 @@ export default class OutlineFlowPlugin extends Plugin {
   }
 
   /**
-   * 把一篇笔记里的所有流程图导成一个单文件网页，放在库里的「流程图网页」文件夹，同名的旧文件直接覆盖。
+   * 把一篇笔记里的所有流程图导成一个单文件网页，放在库里的导出文件夹（中文「流程图网页」，英文 Outline Flow pages），同名的旧文件直接覆盖。
    * 网页里是和插件同一套画图的代码，所以看起来和笔记里一样；只能看、不能改。
    */
   async exportNote(notePath: string): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(notePath);
     if (!(file instanceof TFile) || file.extension !== "md") {
-      new Notice("只能导出 Markdown 笔记。");
+      new Notice(t("export.onlyMarkdown"));
       return;
     }
     if (!__OUTLINE_FLOW_VIEWER__) {
-      new Notice("这个版本里没有带网页查看器，没法导出。请用 npm run build 重新构建插件。");
+      new Notice(t("export.noViewer"));
       return;
     }
     try {
       const charts = collectCharts(await this.app.vault.cachedRead(file), file.basename);
       if (charts.length === 0) {
-        new Notice("这篇笔记里没有 flow 代码块，也没有标题或列表，没有图可以导出。");
+        new Notice(t("export.noCharts"));
         return;
       }
       const note = await this.loadNote(file.path);
@@ -430,20 +449,22 @@ export default class OutlineFlowPlugin extends Plugin {
         // 复制一份：网页里折叠备注这类操作不能改到插件正在用的数据
         charts: charts.map((c) => ({ ...c, data: JSON.parse(JSON.stringify(note.diagrams[c.id] ?? { pos: {} })) })),
         settings: { theme, direction, line, structure, snap, height },
+        lang: getLang(),
       };
       const html = buildExportHtml(payload, __OUTLINE_FLOW_VIEWER__);
-      const out = normalizePath(`${EXPORT_FOLDER}/${file.basename}.html`);
-      await this.ensureFolder(EXPORT_FOLDER);
+      const folder = exportFolder();
+      const out = normalizePath(`${folder}/${file.basename}.html`);
+      await this.ensureFolder(folder);
       await this.app.vault.adapter.write(out, html);
-      new Notice(`导出好了：${out}`);
+      new Notice(t("export.done", { path: out }));
       try {
         (this.app as any).showInFolder?.(out);
       } catch {
         // 打不开文件夹不要紧，文件已经写好了
       }
     } catch (e) {
-      console.error("[outline-flow] 导出网页失败", notePath, e);
-      new Notice("没能导出网页。请检查「" + EXPORT_FOLDER + "」文件夹能不能写入。");
+      console.error("[outline-flow] export failed", notePath, e);
+      new Notice(t("export.failed", { folder: exportFolder() }));
     }
   }
 
@@ -497,7 +518,7 @@ export default class OutlineFlowPlugin extends Plugin {
         if (parsed && parsed.version === 1 && parsed.diagrams && typeof parsed.diagrams === "object") data = parsed;
       }
     } catch (e) {
-      console.error("[outline-flow] 读位置文件失败", path, e);
+      console.error("[outline-flow] failed to read positions file", path, e);
     }
     this.cache.set(notePath, data);
     return data;
@@ -514,8 +535,8 @@ export default class OutlineFlowPlugin extends Plugin {
       await this.app.vault.adapter.write(path, JSON.stringify(data, null, 2));
     });
     const guarded = next.catch((e) => {
-      console.error("[outline-flow] 写位置文件失败", notePath, e);
-      new Notice("节点位置没能存下来。请检查「" + this.settings.folder + "」文件夹能不能写入。");
+      console.error("[outline-flow] failed to write positions file", notePath, e);
+      new Notice(t("save.failed", { folder: this.settings.folder }));
     });
     this.writing.set(notePath, guarded);
     return guarded;
@@ -548,7 +569,7 @@ export default class OutlineFlowPlugin extends Plugin {
       await this.ensureFolder(to.split("/").slice(0, -1).join("/"));
       await this.app.vault.adapter.rename(from, to);
     } catch (e) {
-      console.error("[outline-flow] 位置文件没能跟着笔记改名", from, to, e);
+      console.error("[outline-flow] positions file did not follow the note rename", from, to, e);
     }
   }
 
@@ -922,8 +943,8 @@ export class FlowView extends MarkdownRenderChild {
       const links: LinkInfo[] = evt.target.data("links") ?? [];
       // 插件里点一下是选中，不是打开，所以指针不变成手形，提示里写明怎么打开
       if (readonly) this.stage.style.cursor = "pointer";
-      const shown = links.map((l) => (l.kind === "note" ? `笔记「${l.url}」` : l.url)).join("  ·  ");
-      this.linkTip.setText(readonly ? shown : `${isMac() ? "⌘" : "Ctrl"}+单击打开：${shown}`);
+      const shown = links.map((l) => (l.kind === "note" ? t("link.note", { name: l.url }) : l.url)).join("  ·  ");
+      this.linkTip.setText(readonly ? shown : t("link.openTip", { mod: isMac() ? "⌘" : "Ctrl", links: shown }));
       this.linkTip.show();
     });
     this.cy.on("mouseout", "node.link", () => this.resetLinkHover());
@@ -992,12 +1013,12 @@ export class FlowView extends MarkdownRenderChild {
       elements = buildElements(source, this.structure, { noteLinks: !this.opts.readonly, nearRefs: this.data.nearRefs === true });
     } catch (e: any) {
       this.dropAll();
-      this.showOverlay("这段大纲有一处读不懂：" + (e?.message ?? "请检查缩进和括号") + "。改好之后图会自动出来。", true);
+      this.showOverlay(t("overlay.parseError", { reason: e?.message ?? t("overlay.parseError.default") }), true);
       return;
     }
     if (elements.length === 0) {
       this.dropAll();
-      this.showOverlay("在代码块里写一行字，这里就会出现一个节点。", false);
+      this.showOverlay(t("overlay.empty"), false);
       return;
     }
     this.showOverlay("", false);
@@ -1089,8 +1110,8 @@ export class FlowView extends MarkdownRenderChild {
   private buildHeader(root: HTMLElement) {
     const head = root.createDiv({ cls: "outline-flow-head" });
     head.createDiv({ cls: "outline-flow-title", text: this.opts.title ?? "" });
-    head.createEl("button", { text: "适应窗口" }).addEventListener("click", () => this.fit());
-    const full = (this.fullBtn = head.createEl("button", { text: "全屏" }));
+    head.createEl("button", { text: t("toolbar.fit") }).addEventListener("click", () => this.fit());
+    const full = (this.fullBtn = head.createEl("button", { text: t("toolbar.fullscreen") }));
     full.addEventListener("click", () => {
       // 浏览器不让全屏时（权限、嵌在别的页面里）会拒绝，这里吞掉，按钮点了没反应就是了
       if (this.isFullscreen()) document.exitFullscreen().catch(() => {});
@@ -1109,7 +1130,7 @@ export class FlowView extends MarkdownRenderChild {
   private onFullscreenChange() {
     const full = this.isFullscreen();
     this.containerEl.toggleClass("is-fill", full);
-    this.fullBtn?.setText(full ? "退出全屏" : "全屏");
+    this.fullBtn?.setText(full ? t("toolbar.exitFullscreen") : t("toolbar.fullscreen"));
     if (full) this.stage.style.height = "";
     else this.sizeToGraph();
     this.cy?.resize();
@@ -1164,7 +1185,7 @@ export class FlowView extends MarkdownRenderChild {
       // 网址是真的链接；双链没有地址，点了走 Obsidian 打开
       const a = menu.createEl("a", l.kind === "url" ? { href: l.url, attr: { target: "_blank", rel: "noopener" } } : {});
       a.createEl("span", { text: l.text });
-      if (l.kind === "note") a.createEl("small", { text: `笔记「${l.url}」` });
+      if (l.kind === "note") a.createEl("small", { text: t("link.note", { name: l.url }) });
       else if (l.text !== l.url) a.createEl("small", { text: l.url });
       a.addEventListener("click", (e) => {
         if (l.kind === "note") {
@@ -1248,15 +1269,16 @@ export class FlowView extends MarkdownRenderChild {
     if (!this.stage) return;
     const mac = isMac();
     const focused = this.hasFocus();
-    this.hintEl?.setText(focused ? "拖动平移 · 滚轮 缩放" : `拖动平移 · 按住 ${mac ? "⌘" : "Ctrl"} 滚动缩放`);
+    const mod = mac ? "⌘" : "Ctrl";
+    this.hintEl?.setText(focused ? t("hint.pan.focused") : t("hint.pan.idle", { mod }));
     if (!this.keys) return;
     const parts: string[] = [];
-    if (this.editing) parts.push("回车 确定 · Esc 取消");
+    if (this.editing) parts.push(t("hint.editing"));
     else {
       if (this.selected) {
-        parts.push(`回车 加同级 · Tab 加下级 · ⇧Tab 提一级 · 空格 改字 · Delete 删除 · ${mac ? "⌘Z" : "Ctrl+Z"} 撤回 · ${mac ? "⌘" : "Ctrl"}+单击 打开链接`);
+        parts.push(t("hint.selected", { undo: mac ? "⌘Z" : "Ctrl+Z", mod }));
       }
-      if (focused) parts.push("滚轮 缩放 · 拖空白处 平移");
+      if (focused) parts.push(t("hint.zoom"));
     }
     this.keys.setText(parts.join(" · "));
     if (parts.length) this.keys.show();
@@ -1428,7 +1450,9 @@ export class FlowView extends MarkdownRenderChild {
   // ---------- 在图上输入文字 ----------
 
   /** 加节点时临时节点里先放的字：撑出一个够输入的宽度，输入时按打的字改 */
-  private static NEW_LABEL = "新节点文字";
+  private static get NEW_LABEL(): string {
+    return t("input.newLabel");
+  }
 
   /**
    * 给选中的节点加一个同级或下级。先不写笔记：用和真正写进去一样的规则，算出加了一行以后的大纲，
@@ -1473,7 +1497,7 @@ export class FlowView extends MarkdownRenderChild {
     const raw = await this.plugin.nodeText({ notePath: this.notePath, diagramId: this.diagramId, source: this.source, line: node.data("line") });
     if (!this.cy || this.editing || node.removed()) return;
     if (raw === null) {
-      this.toast("这一行在笔记里对不上，请直接在笔记里改");
+      this.toast(t("toast.lineMismatch"));
       return;
     }
     const label = node.data("label");
@@ -1483,7 +1507,7 @@ export class FlowView extends MarkdownRenderChild {
 
   /** 在节点上盖一个输入框：位置、字号跟着画面的缩放走 */
   private openInput(st: Omit<EditState, "input">) {
-    const input = this.stage.createEl("input", { cls: "outline-flow-input", attr: { type: "text", spellcheck: "false", placeholder: "输入文字" } });
+    const input = this.stage.createEl("input", { cls: "outline-flow-input", attr: { type: "text", spellcheck: "false", placeholder: t("input.placeholder") } });
     input.value = st.raw;
     // 输入框盖在画布上：按下、抬起不能传给画布，不然会被当成点了背景或开始拖画面
     for (const type of ["mousedown", "mouseup", "touchstart", "touchend", "dblclick", "click"]) {
@@ -1649,13 +1673,13 @@ export class FlowView extends MarkdownRenderChild {
     const to = redo ? h.undo : h.redo;
     const e = from.pop();
     if (!e) {
-      this.toast(redo ? "没有可以重做的了" : "没有可以撤回的了");
+      this.toast(redo ? t("toast.nothingToRedo") : t("toast.nothingToUndo"));
       return;
     }
     if (e.kind === "pos") {
       this.restorePos(redo ? e.after : e.before);
       to.push(e);
-      this.toast(redo ? "已重做" : "已撤回");
+      this.toast(redo ? t("toast.redone") : t("toast.undone"));
       return;
     }
     this.setBusy(true);
@@ -1677,8 +1701,8 @@ export class FlowView extends MarkdownRenderChild {
 
     // 结构、主题用自己的弹出菜单（见 picker.ts）：列表整张展开在按钮下面，主题按「分支配色 / 单色」分组
     this.structurePicker = new Picker(bar, root, {
-      aria: "结构",
-      groups: [{ items: Object.entries(STRUCTURES).map(([value, label]) => ({ value, label: label as string })) }],
+      aria: t("toolbar.structure"),
+      groups: [{ items: structureOptions() }],
       value: this.structure,
       onChange: (v) => {
         this.data.structure = v as Structure;
@@ -1693,7 +1717,7 @@ export class FlowView extends MarkdownRenderChild {
     });
 
     this.themePicker = new Picker(bar, root, {
-      aria: "主题",
+      aria: t("toolbar.theme"),
       groups: themeGroups(),
       value: this.theme,
       onChange: (v) => {
@@ -1717,8 +1741,8 @@ export class FlowView extends MarkdownRenderChild {
     });
 
     // 关联的靠近排：只有图里有虚线（引用）时才出现
-    const nearBtn = (this.nearBtn = bar.createEl("button", { text: "关联靠近", attr: { "aria-pressed": "false" } }));
-    nearBtn.setAttr("title", "开着时，同一层的节点按虚线的关系重新排先后，有关联的挨在一起、虚线变短。只改图上的顺序，大纲不动。");
+    const nearBtn = (this.nearBtn = bar.createEl("button", { text: t("toolbar.nearRefs"), attr: { "aria-pressed": "false" } }));
+    nearBtn.setAttr("title", t("toolbar.nearRefs.tip"));
     nearBtn.addEventListener("click", () => {
       this.data.nearRefs = !this.data.nearRefs;
       this.data.pos = {}; // 顺序变了，拖过的位置对不上了
@@ -1729,8 +1753,8 @@ export class FlowView extends MarkdownRenderChild {
     });
 
     // 吸附开关：所有图共用一个设置
-    const snapBtn = (this.snapBtn = bar.createEl("button", { text: "吸附" }));
-    snapBtn.setAttr("title", "开着时，拖节点会贴到别的节点的边和中线上，拖的时候有参考线。");
+    const snapBtn = (this.snapBtn = bar.createEl("button", { text: t("toolbar.snap") }));
+    snapBtn.setAttr("title", t("toolbar.snap.tip"));
     const syncSnap = () => {
       snapBtn.toggleClass("is-active", !!this.plugin.settings.snap);
       snapBtn.setAttr("aria-pressed", String(!!this.plugin.settings.snap));
@@ -1742,7 +1766,7 @@ export class FlowView extends MarkdownRenderChild {
       void this.plugin.saveSettings();
     });
 
-    this.resetBtn = bar.createEl("button", { text: "重新自动排版" });
+    this.resetBtn = bar.createEl("button", { text: t("toolbar.relayout") });
     this.resetBtn.addEventListener("click", () => {
       const before = clonePos(this.data.pos);
       if (this.canEdit && Object.keys(before).length) this.plugin.pushHistory(this.viewportKey, { kind: "pos", before, after: {} });
@@ -1752,19 +1776,19 @@ export class FlowView extends MarkdownRenderChild {
       this.queueSave();
     });
 
-    const copyBtn = bar.createEl("button", { text: "复制为 Flowchart Fun 格式" });
+    const copyBtn = bar.createEl("button", { text: t("toolbar.copyFlowchartFun") });
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(toFlowchartFun(this.source));
-        new Notice("复制好了，可以直接贴到 flowchart.fun。");
+        new Notice(t("copy.ok"));
       } catch {
-        new Notice("没能复制。请手动选中代码块里的文字复制。");
+        new Notice(t("copy.fail"));
       }
     });
 
     const path = this.notePath;
     if (path) {
-      bar.createEl("button", { text: "导出网页" }).addEventListener("click", () => void this.plugin.exportNote(path));
+      bar.createEl("button", { text: t("toolbar.exportPage") }).addEventListener("click", () => void this.plugin.exportNote(path));
     }
   }
 
@@ -1782,13 +1806,13 @@ export class FlowView extends MarkdownRenderChild {
     if (!this.dirSel) return;
     const fixed = !followsDirection(this.structure);
     this.dirSel.disabled = fixed;
-    this.dirSel.setAttr("title", fixed ? `${STRUCTURES[this.structure]}的排布方向是固定的` : "");
+    this.dirSel.setAttr("title", fixed ? t("toolbar.dirFixed", { structure: structureName(this.structure) }) : "");
   }
 
   /** 按开关把备注小字加上或拿掉 */
   private syncNotes() {
     if (this.notesBtn) {
-      this.notesBtn.setText(this.showNotes ? "隐藏备注" : "显示备注");
+      this.notesBtn.setText(this.showNotes ? t("toolbar.hideNotes") : t("toolbar.showNotes"));
       if (this.hasNotes) this.notesBtn.show();
       else this.notesBtn.hide();
     }
@@ -1986,16 +2010,16 @@ export class FlowView extends MarkdownRenderChild {
     this.mainNodes().forEach((n: any) => {
       if (this.data.pos[n.data("key")]) kept++;
     });
-    const tip = "拖节点调位置，按住 Cmd 或 Ctrl 滚动来缩放。";
-    const where = kept > 0 ? `${total} 个节点，其中 ${kept} 个在你拖到的位置。` : `${total} 个节点，现在是自动排的位置。`;
-    const unsaved = this.notePath ? "" : " 这张图这次不会记住位置。";
+    const tip = t("status.tip");
+    const where = kept > 0 ? t("status.kept", { total, kept }) : t("status.auto", { total });
+    const unsaved = this.notePath ? "" : t("status.unsaved");
     this.status.empty();
     // 有问题的行：每条后面跟一个「去这一行」，点了跳到笔记里那一行，长文档里不用自己找
     for (const w of this.warnings) {
       const item = this.status.createEl("span", { cls: "outline-flow-warning", text: w.text });
       const path = this.notePath;
       if (w.find && path) {
-        const go = item.createEl("a", { cls: "outline-flow-goto", text: "去这一行", href: "#" });
+        const go = item.createEl("a", { cls: "outline-flow-goto", text: t("status.goto"), href: "#" });
         go.addEventListener("click", (e) => {
           e.preventDefault();
           void this.plugin.revealLine(path, w.find);
@@ -2003,7 +2027,7 @@ export class FlowView extends MarkdownRenderChild {
       }
       this.status.append(" ");
     }
-    this.status.append(where + tip + unsaved);
+    this.status.append(t("status.line", { where, tip, unsaved }));
     this.status.toggleClass("has-warning", this.warnings.length > 0);
     if (this.resetBtn) this.resetBtn.disabled = kept === 0;
   }
@@ -2043,7 +2067,7 @@ class SideView extends ItemView {
     return SIDE_VIEW;
   }
   getDisplayText() {
-    return "流程图";
+    return t("side.title");
   }
   getIcon() {
     return "workflow";
@@ -2120,7 +2144,7 @@ class SideView extends ItemView {
       (recent instanceof MarkdownView && recent.file ? recent : undefined) ??
       open[0];
     if (!md || !md.file) {
-      this.message("none", "打开一篇笔记，这里会显示它里面的流程图。");
+      this.message("none", t("side.none"));
       return;
     }
 
@@ -2158,7 +2182,7 @@ class SideView extends ItemView {
     if (blocks.length === 0 && !outline.trim()) {
       this.lastPath = path;
       this.lastIndex = 0;
-      this.message("empty:" + path, "这篇笔记里还没有标题或列表。用 # 写几个标题，或者用 - 写几行，图就会出现在这里。");
+      this.message("empty:" + path, t("side.empty"));
       return;
     }
 
@@ -2203,28 +2227,28 @@ class OutlineFlowSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
 
     new Setting(containerEl)
-      .setName("位置存在哪个文件夹")
-      .setDesc("你拖过的节点位置存在库里的这个文件夹，不写进笔记。改名后，原来的文件夹会一起搬过去。")
+      .setName(t("settings.folder.name"))
+      .setDesc(t("settings.folder.desc"))
       .addText((text) => {
         text.setValue(s.folder);
         text.inputEl.addEventListener("blur", async () => {
           const next = normalizePath(text.getValue().trim());
           if (next === s.folder) return;
           if (!next || next === "/" || next.startsWith(".")) {
-            new Notice("文件夹名不能留空，也不能以点开头。已改回「" + s.folder + "」。");
+            new Notice(t("settings.folder.invalid", { folder: s.folder }));
             text.setValue(s.folder);
             return;
           }
           try {
             const moved = await this.plugin.moveFolder(s.folder, next);
             if (!moved) {
-              new Notice("「" + next + "」已经存在，换一个名字。已改回「" + s.folder + "」。");
+              new Notice(t("settings.folder.exists", { next, folder: s.folder }));
               text.setValue(s.folder);
               return;
             }
           } catch (e) {
-            console.error("[outline-flow] 搬文件夹失败", e);
-            new Notice("文件夹没能搬过去，已改回「" + s.folder + "」。");
+            console.error("[outline-flow] failed to move folder", e);
+            new Notice(t("settings.folder.moveFailed", { folder: s.folder }));
             text.setValue(s.folder);
             return;
           }
@@ -2235,11 +2259,11 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("新图的样式")
-      .setDesc("跟上一张图一样：在任何一张图上换了主题或结构，之后新打开的图就用这一套。用固定的样式：新图一律用下面选的主题和结构。已经画过的图都记着自己的样式，不受影响。")
+      .setName(t("settings.newStyle.name"))
+      .setDesc(t("settings.newStyle.desc"))
       .addDropdown((dd) => {
-        dd.addOption("last", "跟上一张图一样");
-        dd.addOption("fixed", "用固定的样式");
+        dd.addOption("last", t("settings.newStyle.last"));
+        dd.addOption("fixed", t("settings.newStyle.fixed"));
         dd.setValue(s.newStyle).onChange(async (v) => {
           s.newStyle = v as Settings["newStyle"];
           await this.plugin.saveSettings();
@@ -2247,10 +2271,10 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("新图用哪套主题")
-      .setDesc("选「跟上一张图一样」时，这里会随你最近一次换的主题自动更新。每张图可以在图上方另选。")
+      .setName(t("settings.theme.name"))
+      .setDesc(t("settings.theme.desc"))
       .addDropdown((dd) => {
-        for (const [key, t] of Object.entries(THEMES)) dd.addOption(key, t.name);
+        for (const key of Object.keys(THEMES)) dd.addOption(key, themeName(key));
         dd.setValue(s.theme).onChange(async (v) => {
           s.theme = v;
           await this.plugin.saveSettings();
@@ -2258,10 +2282,10 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("新图用哪种结构")
-      .setDesc("思维导图从中间往左右两边长；逻辑图一直往右；组织结构图从上往下；放射图从中心往四周一圈圈展开。每张图可以在图上方另选。")
+      .setName(t("settings.structure.name"))
+      .setDesc(t("settings.structure.desc"))
       .addDropdown((dd) => {
-        for (const [key, name] of Object.entries(STRUCTURES)) dd.addOption(key, name as string);
+        for (const o of structureOptions()) dd.addOption(o.value, o.label);
         dd.setValue(liveStructure(s.structure)).onChange(async (v) => {
           s.structure = v as Structure;
           await this.plugin.saveSettings();
@@ -2269,8 +2293,8 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("拖节点时吸附对齐")
-      .setDesc("开着时，拖节点会贴到附近别的节点的左边、中线、右边（上边、中线、下边）上，拖的时候有参考线。关掉就停在松手的地方。图上方的「吸附」按钮也能开关。")
+      .setName(t("settings.snap.name"))
+      .setDesc(t("settings.snap.desc"))
       .addToggle((tg) => {
         tg.setValue(s.snap).onChange(async (v) => {
           s.snap = v;
@@ -2279,15 +2303,15 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("图的高度")
-      .setDesc(`单位是像素，${MIN_HEIGHT} 到 ${MAX_HEIGHT} 之间。重新打开笔记后变。`)
+      .setName(t("settings.height.name"))
+      .setDesc(t("settings.height.desc", { min: MIN_HEIGHT, max: MAX_HEIGHT }))
       .addText((text) => {
         text.inputEl.type = "number";
         text.setValue(String(s.height));
         text.inputEl.addEventListener("blur", async () => {
           const n = Number(text.getValue());
           if (!Number.isFinite(n) || n < MIN_HEIGHT || n > MAX_HEIGHT) {
-            new Notice(`高度要在 ${MIN_HEIGHT} 到 ${MAX_HEIGHT} 之间。已改回 ${s.height}。`);
+            new Notice(t("settings.height.invalid", { min: MIN_HEIGHT, max: MAX_HEIGHT, height: s.height }));
             text.setValue(String(s.height));
             return;
           }

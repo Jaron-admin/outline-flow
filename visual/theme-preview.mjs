@@ -16,7 +16,7 @@ const tmp = mkdtempSync(join(tmpdir(), "outline-flow-themes-"));
 buildSync({ entryPoints: ["src/export.ts"], bundle: true, format: "esm", outfile: join(tmp, "export.mjs"), loader: { ".css": "text" }, logLevel: "error" });
 buildSync({ entryPoints: ["src/themes.ts"], bundle: true, format: "esm", outfile: join(tmp, "themes.mjs"), logLevel: "error" });
 const { buildExportHtml, collectCharts } = await import(pathToFileURL(join(tmp, "export.mjs")).href);
-const { THEMES } = await import(pathToFileURL(join(tmp, "themes.mjs")).href);
+const { THEMES, themeName } = await import(pathToFileURL(join(tmp, "themes.mjs")).href);
 const viewer = await buildViewer();
 
 const title = basename(note, ".md");
@@ -28,7 +28,7 @@ const STRUCTS = { mindmap: "思维导图", logic: "逻辑图", org: "组织结�
 for (const [s, sname] of Object.entries(STRUCTS)) {
   const charts = [...NEW, ...OLD].map((k, i) => ({
     id: String(i),
-    title: `${NEW.includes(k) ? "新 · " : "旧 · "}${THEMES[k].name}`,
+    title: `${NEW.includes(k) ? "新 · " : "旧 · "}${themeName(k)}`,
     source: chart.source,
     data: { pos: {}, theme: k, structure: s },
   }));
