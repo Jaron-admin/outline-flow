@@ -28,7 +28,7 @@ import { findRings, markRings, placeRings } from "./ring";
 import type { Ring } from "./ring";
 import { buildExportHtml, collectCharts, ExportPayload } from "./export";
 import { Applied, EditOp, diffRange, lineIsNode, locate, readNodeText, sourceTree, targetOf, applyEdit, diagramSource } from "./edit";
-import { BLOCK_LANG, LinkInfo, buildElements, extractOutlineFromMarkdown, findFlowBlocks, toFlowchartFun } from "./graph";
+import { BLOCK_LANGS, LinkInfo, buildElements, extractOutlineFromMarkdown, findFlowBlocks, toFlowchartFun } from "./graph";
 import { layoutPoints } from "./pack";
 import { gate, pickDiagram } from "./side";
 import {
@@ -400,7 +400,14 @@ export default class OutlineFlowPlugin extends Plugin {
       await this.saveSettings();
     }
 
-    this.registerMarkdownCodeBlockProcessor(BLOCK_LANG, (source, el, ctx) => this.render(source, el, ctx));
+    // 两个名字都注册。flow 可能已经被别的插件占了，注册不上就跳过，outline-flow 照样能用
+    for (const lang of BLOCK_LANGS) {
+      try {
+        this.registerMarkdownCodeBlockProcessor(lang, (source, el, ctx) => this.render(source, el, ctx));
+      } catch (e) {
+        console.warn(`[outline-flow] code block "${lang}" is already used by another plugin; use \`\`\`outline-flow instead.`, e);
+      }
+    }
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => this.onRename(file, oldPath)));
     this.addSettingTab(new OutlineFlowSettingTab(this.app, this));
 

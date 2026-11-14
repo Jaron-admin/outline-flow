@@ -699,3 +699,10 @@ test("关联靠近排：同级按虚线重排，有关联的挨近；关着时�
   const withSum = "根\n  甲\n    甲1\n  乙\n  丙\n  } 三个\n  丁\n    丁1: (甲1)\n";
   assert.equal(order(buildElements(withSum, "logic", { nearRefs: true })), "甲乙丙丁");
 });
+
+test("代码块名：outline-flow 和老的 flow 都认，按出现顺序编号", () => {
+  const md = "# a\n```outline-flow\n甲\n  乙\n```\n文字\n```flow\n丙\n```\n```js\nx\n```\n";
+  const bs = findFlowBlocks(md);
+  assert.equal(bs.length, 2);
+  assert.deepEqual(bs.map((b) => b.source.trim()), ["甲\n  乙", "丙"]);
+});

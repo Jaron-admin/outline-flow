@@ -1,27 +1,39 @@
 # Outline Flow
 
-Turn an indented outline into a mind map or flowchart, right inside your notes. Edit the outline on the chart with Enter and Tab, the way you would in a mind-mapping app.
+Outline Flow draws mind maps in Obsidian. There are two ways to use it:
 
-[中文说明在下面](#中文说明)
+- **In a note, with a code block.** Write an `outline-flow` code block (the older `flow` name also works), one indented line per node. The chart updates as you type.
+- **In the side panel, without a code block.** Open the side panel and the note's `#` headings and lists are drawn as one mind map. Edit a node on the map and the change is written back to the heading or list item in the note.
 
-## Features
+The syntax is compatible with [Flowchart Fun](https://flowchart.fun) and adds loops, summary braces and notes under nodes. Switch between four layouts at any time, pick from 17 themes, or export a note's charts as one HTML file that opens in a browser.
 
-- **Write an outline, get a chart.** Put the outline in a `flow` code block, or open the side panel and the whole note's headings and lists become one chart.
-- **Four layouts:** mind map, logic chart (left to right), org chart (top down) and radial map.
-- **Edit on the chart:** click a node, then Enter adds a sibling, Tab adds a child, Shift+Tab promotes, Space or F2 edits the text, Delete removes the node with its children. Changes are written back to the note. Undo and redo with ⌘Z / ⌘⇧Z (Ctrl+Z / Ctrl+Y).
-- **Themes:** 17 themes in two groups — branch colors (each first-level branch gets its own color) and single color.
-- **Links:** ⌘/Ctrl + click a node to open its URL or `[[note]]`.
-- **Back-references:** write `(name)` to link back to an earlier node. A chain that links back to its start (like the five elements) is drawn as a regular polygon.
-- **Summary braces:** a `}` line wraps the siblings above it in a brace with a summary.
-- **Notes under nodes:** text in `【】` is shown in small type under the node and can be folded.
-- **Drag and snap:** drag nodes anywhere; they snap to other nodes' edges and center lines, with guides. Positions are saved per note.
-- **Export:** save the charts of a note as a single HTML file that anyone can open in a browser. It follows the viewer's light or dark mode.
-- **Markdown inside nodes:** bold, code, links and wikilinks are shown as clean text.
+[中文说明](#中文说明)
+
+## What it does
+
+- **The chart is drawn from the note.** There is no second copy of your outline. The note stays plain Markdown: no frontmatter and no hidden markers. Only the positions of nodes you drag are stored in a vault folder, one JSON file per note (see [Data](#data)).
+- **Loops, summaries and labels.** `(name)` links back to an earlier node, and a chain that returns to its start is drawn as a regular polygon. A `}` line wraps the siblings above it in a summary brace. Write `label: node` to put text on the connector.
+- **Export one HTML file.** Export every chart in a note to a single self-contained HTML page. It opens in a browser, needs no Obsidian install and no account, and follows the viewer's light or dark mode.
+
+## Editing
+
+- **Live rendering.** Charts update as you type. There is no generate button and no rebuild step.
+- **Switch layouts.** Mind map, logic chart (left to right), org chart (top down) and radial map. Same outline, different shape, one switch in the toolbar.
+- **Keyboard editing.** Edit on the chart the way you would in a mind-mapping app: click a node, then Enter adds a sibling, Tab adds a child, Shift+Tab promotes, Space or F2 edits the text, Delete removes the node with its children. Undo and redo with ⌘Z / ⌘⇧Z (Ctrl+Z / Ctrl+Y).
+- **Drag and snap.** Move nodes anywhere; they snap to other nodes' edges and center lines, with guides. Positions are saved per note.
+- **17 themes** in two groups: branch colors (each first-level branch gets its own color) and single color.
+- **Links.** ⌘/Ctrl + click a node to open its URL or `[[note]]`.
+- **Notes under nodes.** Text in `【】` shows in small type under the node and can be folded.
+- **Markdown inside nodes.** Bold, code, links and wikilinks render as clean text.
+
+## Install
+
+In Obsidian: Settings → Community plugins → Browse → search "Outline Flow" → Install, then Enable.
 
 ## Syntax
 
 ````markdown
-```flow
+```outline-flow
 Order placed
   Check stock
     In stock: Charge card
@@ -40,7 +52,7 @@ Order placed
 | `} summary` | Brace around the siblings above, with a summary |
 | `- `, `* `, `1. `, `#` headings | Ordinary Markdown outlines work too |
 
-The syntax is compatible with [Flowchart Fun](https://flowchart.fun).
+The older `flow` block name still works. If another plugin already uses `flow`, use `outline-flow`.
 
 ## Mobile
 
@@ -48,7 +60,7 @@ Works on phones and tablets. Charts inside code blocks are view-only on touch sc
 
 ## Data
 
-Node positions are stored as JSON files in a vault folder (`Outline Flow positions` by default, configurable in settings). Nothing is sent over the network.
+Node positions are stored as JSON files in a vault folder (`Outline Flow positions` by default, configurable in settings), one file per note. Nothing is sent over the network.
 
 ## Language
 
@@ -62,21 +74,57 @@ GPL-3.0. Third-party libraries: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES
 
 ## 中文说明
 
-把缩进大纲画成思维导图或流程图，就在笔记里。还能直接在图上用回车、Tab 改大纲。
+Outline Flow 在 Obsidian 里画思维导图。有两种用法：
 
-### 功能
+- **写代码块**：在笔记里写一个 `outline-flow` 代码块（老的 `flow` 也能用），一行一个节点，缩进表示层级。边打字边出图。
+- **用侧栏**：笔记里不写代码块，打开侧栏，整篇笔记的 `#` 标题和列表会画成一张思维导图。在图上改节点，改动会写回笔记的标题和列表。
 
-- **写大纲就出图**：放在 `flow` 代码块里；或者打开侧栏，整篇笔记的标题和列表直接画成一张图。
-- **四种结构**：思维导图、逻辑图（往右）、组织结构图（往下）、放射图。
-- **在图上改**：点一下节点，回车加同级、Tab 加下级、Shift+Tab 提一级、空格或 F2 改字、Delete 连下级一起删，改动写回笔记。⌘Z / ⌘⇧Z（Ctrl+Z / Ctrl+Y）撤回、重做。
-- **主题**：17 套，分「分支配色」和「单色」两组。
-- **链接**：按住 ⌘ 或 Ctrl 单击节点，打开网址或 `[[笔记]]`。
-- **回指**：写 `(名字)` 连回前面的节点；顺着写一串又回到开头的（比如五行），自动摆成正多边形。
-- **概要**：`}` 一行用大括号把上面的兄弟括起来。
+语法兼容 [Flowchart Fun](https://flowchart.fun)，另加了回环、概要括号和节点备注。四种版式随时切换，17 套主题，还能把整篇笔记的图导出成一个 HTML 文件，用浏览器打开就能看。
+
+### 能做什么
+
+- **图从笔记文字画出来**：没有另存一份大纲。笔记本身保持纯 Markdown，不加 frontmatter，也不加隐藏标记。只有你拖过的节点位置会另外保存到库里的一个文件夹（每篇笔记一个 JSON，见「数据」）。
+- **回环、概要和连线文字**：`(名字)` 连回前面的节点，一串连回开头会摆成正多边形；`}` 给上面的兄弟套一个概要括号；`label: 节点` 在连线上写字。
+- **导出单个 HTML**：把一篇笔记里的图导出成一个自包含的 HTML 页面。用浏览器打开就能看，不用装 Obsidian，不用账号，还跟随对方系统的深浅色。
+
+### 用起来
+
+- **实时**：打字就渲染，没有「生成」按钮，不用重新构建。
+- **版式随时切**：思维导图、逻辑图（向右）、组织结构图（向下）、放射图。同一份大纲，换个形状。
+- **键盘编辑**：像常见的思维导图软件那样直接在图上改：点节点后回车加同级、Tab 加下级、Shift+Tab 提一级、空格或 F2 改字、Delete 连下级一起删；⌘Z / ⌘⇧Z（Ctrl+Z / Ctrl+Y）撤回、重做。
+- **拖动吸附**：拖到哪都行，会贴到别的节点的边和中线，有参考线；位置按笔记记住。
+- **17 套主题**：分「分支配色」和「单色」两组。
+- **链接**：⌘ 或 Ctrl + 单击节点，打开网址或 `[[笔记]]`。
 - **备注**：`【】` 里的字显示在节点下方，可以收起。
-- **拖动和吸附**：拖节点时贴到别的节点的边和中线上，有参考线；位置按笔记保存。
-- **导出网页**：把一篇笔记里的图存成一个 HTML 文件，发给别人用浏览器就能看，跟着对方系统的深浅色。
 - **节点里的 Markdown**：加粗、代码、链接、双链都显示成干净的文字。
+
+### 安装
+
+Obsidian → 设置 → 第三方插件 → 浏览 → 搜索 "Outline Flow" → 安装并启用。
+
+### 语法
+
+````markdown
+```outline-flow
+订单下达
+  检查库存
+    有货: 扣款
+      失败: (订单下达)
+    缺货: 通知客户【1 小时内发出】
+  } 履约
+```
+````
+
+| 写法 | 含义 |
+| --- | --- |
+| 缩进一级 | 成为上一行的下级（空格或 Tab 都行） |
+| `label: 节点` | 连线上显示文字 |
+| `(节点)` | 连回前面写过的节点 |
+| `节点【备注】` | 节点下方显示备注 |
+| `} 概要` | 用大括号把上面的兄弟括起来 |
+| `- `、`* `、`1. `、`#` 标题 | 普通 Markdown 大纲也能直接画 |
+
+老的 `flow` 写法照样能用；如果别的插件也用了 `flow`，请用 `outline-flow`。
 
 ### 手机
 
@@ -84,7 +132,7 @@ GPL-3.0. Third-party libraries: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES
 
 ### 数据
 
-拖过的位置存在库里的 `流程图位置` 文件夹（设置里可以改），一篇笔记一个 JSON 文件。不联网，不上传任何东西。
+拖过的节点位置存在库里的「流程图位置」文件夹（设置里可以改），一篇笔记一个 JSON 文件。不联网，不上传任何东西。
 
 ### 语言
 

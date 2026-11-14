@@ -996,8 +996,12 @@ function layoutAutoBraces(tree: Tree): FlowElement[] {
   return out;
 }
 
-export const BLOCK_LANG = "flow";
-const FENCE_OPEN = new RegExp("^\\s*(`{3,}|~{3,})\\s*" + BLOCK_LANG + "\\s*$");
+/**
+ * 代码块的名字。主推 outline-flow；老的 flow 照样认（之前写的笔记不用改）。
+ * flow 这个名字别的插件也在用，被占了时只有 outline-flow 能用，见 main.ts 的注册。
+ */
+export const BLOCK_LANGS = ["outline-flow", "flow"] as const;
+const FENCE_OPEN = new RegExp("^\\s*(`{3,}|~{3,})\\s*(?:" + BLOCK_LANGS.join("|") + ")\\s*$");
 
 export interface FlowBlock {
   index: number;
