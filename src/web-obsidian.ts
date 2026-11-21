@@ -88,6 +88,30 @@ export class Setting {
 }
 
 export class MarkdownView extends Component {}
+
+/** 右键菜单的替身：导出的网页里用不到；冒烟测试里记下菜单项，挂在 globalThis.__outlineFlowMenu 上 */
+export class Menu {
+  items: { title: string; disabled: boolean; run: () => void }[] = [];
+  addItem(cb: (it: any) => void) {
+    const item = { title: "", disabled: false, run: () => {} };
+    const api: any = {
+      setTitle: (t: string) => ((item.title = t), api),
+      setIcon: () => api,
+      setDisabled: (d: boolean) => ((item.disabled = d), api),
+      onClick: (f: () => void) => ((item.run = f), api),
+    };
+    cb(api);
+    this.items.push(item);
+    return this;
+  }
+  addSeparator() {
+    return this;
+  }
+  showAtMouseEvent() {
+    (globalThis as any).__outlineFlowMenu = this;
+    return this;
+  }
+}
 export class WorkspaceLeaf {}
 export class App {}
 export class TAbstractFile {}

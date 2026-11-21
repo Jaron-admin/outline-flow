@@ -87,3 +87,11 @@ test("吸附：和有线连着的节点中线对中线优先，哪怕别的节�
   const far = snapTo({ x: 0, y: 130, w: 60, h: 30 }, [{ x: 300, y: 100, w: 60, h: 30, linked: true }], 14);
   assert.equal(far.y, 130);
 });
+
+test("吸附：横竖都吸到同一个节点上会叠在一起时，只吸一个方向", () => {
+  const r = snapTo({ x: 105, y: 106, w: 60, h: 30 }, [{ x: 100, y: 100, w: 60, h: 30 }], 14);
+  const overlap = Math.abs(r.x - 100) < 60 - 1 && Math.abs(r.y - 100) < 30 - 1;
+  assert.ok(!(r.x === 100 && r.y === 100), JSON.stringify(r));
+  // 原地本来就叠着时，不吸也不会更糟；吸了就不能叠
+  if (r.vx !== null || r.hy !== null) assert.ok(!overlap, JSON.stringify(r));
+});

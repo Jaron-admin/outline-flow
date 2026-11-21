@@ -50,6 +50,7 @@ for (const p of notes.sort()) {
   pages.push(file);
 }
 console.log(`${pages.length} 篇有图`);
+if (process.env.NOSHOT) process.exit(0); // 只要网页，不截图
 
 // 截图：Chrome 调试协议，整页
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

@@ -23,7 +23,9 @@ export type EditOp =
   | { kind: "addSibling"; line: number; text: string }
   | { kind: "addChild"; line: number; text: string }
   | { kind: "promote"; line: number }
-  | { kind: "remove"; line: number };
+  | { kind: "remove"; line: number }
+  | { kind: "moveUp"; line: number }
+  | { kind: "moveDown"; line: number };
 
 export interface EditOk {
   ok: true;
@@ -468,6 +470,42 @@ export function removeNode(text: string, target: Target, line: number): EditResu
   });
 }
 
+/**
+ * 上移、下移：和相邻的同级换位置，连同各自的整棵子树（标题是整节）一起换。
+ * 只和同一种的兄弟换（标题和标题、列表项和列表项），中间隔着的空行留在原处。
+ */
+export function moveNode(text: string, target: Target, line: number, dir: -1 | 1): EditResult {
+  return run(text, (t) => {
+    const m = buildModel(t, target);
+    const i = m?.byLine.get(line);
+    if (!m || i === undefined) return no(tr("edit.noRow"));
+    const r = m.rows[i];
+    if (m.mode === "block" && m.hasHeading) return no(tr("edit.headingInBlockEdit"));
+    const sibs = m.rows.flatMap((k, j) => (k.parent === r.parent && k.kind === r.kind ? [j] : []));
+    const at = sibs.indexOf(i);
+    const other = sibs[at + dir];
+    if (other === undefined) return no(tr(dir < 0 ? "edit.firstAlready" : "edit.lastAlready"));
+    const [a, b] = dir < 0 ? [other, i] : [i, other]; // a 在上、b 在下
+    // 每一块到哪里结束：去掉块尾的空行，空行算作两块之间的间隔
+    const endOf = (j: number) => {
+      const row = m.rows[j];
+      const raw = row.kind === "heading" && m.mode === "outline" ? sectionEnd(m, j) - 1 : lastLineOf(m, j);
+      return trimBlank(m, row.line, raw);
+    };
+    const aStart = m.rows[a].line;
+    const aEnd = endOf(a);
+    const bStart = m.rows[b].line;
+    const bEnd = endOf(b);
+    const blockA = m.lines.slice(aStart, aEnd + 1);
+    const gap = m.lines.slice(aEnd + 1, bStart);
+    const blockB = m.lines.slice(bStart, bEnd + 1);
+    m.lines.splice(aStart, bEnd - aStart + 1, ...blockB, ...gap, ...blockA);
+    // 换完以后，被挪的那个节点在哪一行
+    const pick = dir < 0 ? aStart : aStart + blockB.length + gap.length;
+    return { ok: true, text: join(m.lines), line: pick };
+  });
+}
+
 /** 统一处理换行符：全文里有 \r\n 的话，先当 \n 改，改完再换回去 */
 function run(text: string, fn: (t: string) => EditResult): EditResult {
   const crlf = text.includes("\r\n");
@@ -517,6 +555,12 @@ export function applyEdit(text: string, target: Target, source: string, op: Edit
       break;
     case "remove":
       r = removeNode(text, target, line);
+      break;
+    case "moveUp":
+      r = moveNode(text, target, line, -1);
+      break;
+    case "moveDown":
+      r = moveNode(text, target, line, 1);
       break;
   }
   if (!r.ok) return r;

@@ -47,5 +47,17 @@ export function snapTo(moving: Box, others: Box[], range: number): Snap {
         if (rawY <= range && rawY - bias < bestY.d) bestY = { d: rawY - bias, shift: oy[j] - my[i], line: oy[j] };
       }
   }
-  return { x: moving.x + bestX.shift, y: moving.y + bestY.shift, vx: bestX.line, hy: bestY.line };
+  // 吸完不能和别的节点叠在一起（横竖都吸到同一个节点的中线上，两个节点就完全重合了）。
+  // 叠上了就退一步：只吸一个方向（离得近的那个优先），再不行就都不吸
+  const overlaps = (x: number, y: number) =>
+    others.some((o) => Math.abs(o.x - x) < (o.w + moving.w) / 2 - 1 && Math.abs(o.y - y) < (o.h + moving.h) / 2 - 1);
+  const sx = moving.x + bestX.shift;
+  const sy = moving.y + bestY.shift;
+  const tries: Snap[] = [{ x: sx, y: sy, vx: bestX.line, hy: bestY.line }];
+  const onlyX: Snap = { x: sx, y: moving.y, vx: bestX.line, hy: null };
+  const onlyY: Snap = { x: moving.x, y: sy, vx: null, hy: bestY.line };
+  if (bestX.d <= bestY.d) tries.push(onlyX, onlyY);
+  else tries.push(onlyY, onlyX);
+  for (const t of tries) if ((t.vx !== null || t.hy !== null) && !overlaps(t.x, t.y)) return t;
+  return { x: moving.x, y: moving.y, vx: null, hy: null };
 }

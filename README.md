@@ -19,7 +19,9 @@ The syntax is compatible with [Flowchart Fun](https://flowchart.fun) and adds lo
 
 - **Live rendering.** Charts update as you type. There is no generate button and no rebuild step.
 - **Switch layouts.** Mind map, logic chart (left to right), org chart (top down) and radial map. Same outline, different shape, one switch in the toolbar.
-- **Keyboard editing.** Edit on the chart the way you would in a mind-mapping app: click a node, then Enter adds a sibling, Tab adds a child, Shift+Tab promotes, Space or F2 edits the text, Delete removes the node with its children. Undo and redo with ⌘Z / ⌘⇧Z (Ctrl+Z / Ctrl+Y).
+- **Keyboard editing.** Edit on the chart the way you would in a mind-mapping app: click a node, then Enter adds a sibling, Tab adds a child, Shift+Tab promotes, Space or F2 edits the text, Delete removes the node with its children, Alt+↑/↓ moves it among its siblings. Undo and redo with ⌘Z / ⌘⇧Z (Ctrl+Z / Ctrl+Y).
+- **Right-click menu.** Right-click a node to add a child or sibling, edit, move, promote, delete, open its link or show it in the note. Right-click empty space to fit the chart, re-layout or export.
+- **Follow the note.** Click a node on the chart in the side panel and the note scrolls to that line (can be turned off in settings).
 - **Drag and snap.** Move nodes anywhere; they snap to other nodes' edges and center lines, with guides. Positions are saved per note.
 - **17 themes** in two groups: branch colors (each first-level branch gets its own color) and single color.
 - **Links.** ⌘/Ctrl + click a node to open its URL or `[[note]]`.
@@ -91,7 +93,9 @@ Outline Flow 在 Obsidian 里画思维导图。有两种用法：
 
 - **实时**：打字就渲染，没有「生成」按钮，不用重新构建。
 - **版式随时切**：思维导图、逻辑图（向右）、组织结构图（向下）、放射图。同一份大纲，换个形状。
-- **键盘编辑**：像常见的思维导图软件那样直接在图上改：点节点后回车加同级、Tab 加下级、Shift+Tab 提一级、空格或 F2 改字、Delete 连下级一起删；⌘Z / ⌘⇧Z（Ctrl+Z / Ctrl+Y）撤回、重做。
+- **键盘编辑**：像常见的思维导图软件那样直接在图上改：点节点后回车加同级、Tab 加下级、Shift+Tab 提一级、空格或 F2 改字、Delete 连下级一起删、⌥↑↓ 和同级换位置；⌘Z / ⌘⇧Z（Ctrl+Z / Ctrl+Y）撤回、重做。
+- **右键菜单**：在节点上右键可以加下级、加同级、改字、上移下移、提一级、删除、打开链接、在笔记里定位；在空白处右键可以适应窗口、重新自动排版、导出网页。
+- **笔记跟着滚**：在侧栏的图上点一个节点，笔记就滚到对应那一行（设置里可以关掉）。
 - **拖动吸附**：拖到哪都行，会贴到别的节点的边和中线，有参考线；位置按笔记记住。
 - **17 套主题**：分「分支配色」和「单色」两组。
 - **链接**：⌘ 或 Ctrl + 单击节点，打开网址或 `[[笔记]]`。

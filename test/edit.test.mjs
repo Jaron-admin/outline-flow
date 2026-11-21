@@ -522,3 +522,23 @@ test("代码块里有 # 标题：只能改字，别的操作不动手", () => {
   assert.equal(E.promote(t, B, 2).ok, false);
   assert.equal(E.removeNode(t, B, 2).ok, false);
 });
+
+test("上移下移：代码块里连同子树和同级换位置", () => {
+  const text = fence("根", "  甲", "    甲一", "  乙", "    乙一", "  丙");
+  const r = ok(E.moveNode(text, B, at(text, "乙"), -1));
+  assert.equal(r.text, fence("根", "  乙", "    乙一", "  甲", "    甲一", "  丙"));
+  assert.equal(r.line, at(r.text, "  乙"));
+  const d = ok(E.moveNode(text, B, at(text, "  甲"), 1));
+  assert.equal(d.text, fence("根", "  乙", "    乙一", "  甲", "    甲一", "  丙"));
+  assert.equal(d.line, at(d.text, "  甲"));
+  assert.equal(E.moveNode(text, B, at(text, "  甲"), -1).ok, false, "第一个不能再上移");
+  assert.equal(E.moveNode(text, B, at(text, "丙"), 1).ok, false, "最后一个不能再下移");
+});
+
+test("上移下移：整篇大纲里列表项和标题节各自换，中间的空行留在原处", () => {
+  const text = "# 根\n\n## 甲\n- 甲一\n\n## 乙\n- 乙一\n- 乙二\n";
+  const r = ok(E.moveNode(text, O, at(text, "## 乙"), -1));
+  assert.equal(r.text, "# 根\n\n## 乙\n- 乙一\n- 乙二\n\n## 甲\n- 甲一\n");
+  const l = ok(E.moveNode(text, O, at(text, "乙二"), -1));
+  assert.equal(l.text, "# 根\n\n## 甲\n- 甲一\n\n## 乙\n- 乙二\n- 乙一\n");
+});

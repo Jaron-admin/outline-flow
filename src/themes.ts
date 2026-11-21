@@ -412,14 +412,15 @@ function selectRules(t: Theme): any[] {
   const accent = t.root.grad?.[0] ?? t.root.bg;
   return [
     {
+      // 选中：外面描一圈强调色的轮廓线，跟着节点自己的圆角走。
+      // 以前用的是底下垫一块半透明的光晕，光晕的圆角和节点对不上，看着像节点变了形
       selector: "node.selected",
       style: {
-        "border-width": Math.max(t.node.borderWidth, 2),
-        "border-color": accent,
-        "underlay-color": accent,
-        "underlay-opacity": 0.22,
-        "underlay-padding": 5,
-        "underlay-shape": "round-rectangle",
+        "outline-width": 2,
+        "outline-color": accent,
+        "outline-opacity": 1,
+        "outline-offset": 3,
+        "outline-style": "solid",
       },
     },
     { selector: "node.temp, node.fresh", style: { "border-style": "dashed", "border-width": 1.5, "border-color": accent } },
@@ -771,7 +772,6 @@ export function styleFor(
         style: { shape: "round-diamond", "corner-radius": 6, padding: 26, "text-max-width": 96 },
       },
       { selector: "node.summary-node", style: { "corner-radius": 4 } },
-      { selector: "node.decision.selected", style: { "underlay-shape": "ellipse" } },
     );
   }
   if (structure === "radial") {

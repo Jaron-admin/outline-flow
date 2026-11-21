@@ -13,6 +13,7 @@ import {
   TFile,
   normalizePath,
   Platform,
+  Menu,
 } from "obsidian";
 import * as obsidian from "obsidian";
 import cytoscape from "cytoscape";
@@ -69,6 +70,8 @@ export interface Settings {
   height: number;
   /** 新图的样式：last 跟上一张改过的图一样；fixed 用设置里选定的主题和结构 */
   newStyle: "last" | "fixed";
+  /** 在侧栏的图上点节点，笔记跟着滚到对应那一行 */
+  clickToJump: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -80,6 +83,7 @@ const DEFAULTS: Settings = {
   snap: true,
   height: 420,
   newStyle: "last",
+  clickToJump: true,
 };
 
 export interface Point {
@@ -203,6 +207,30 @@ export default class OutlineFlowPlugin extends Plugin {
     const to = { line: at, ch: lines[at].length };
     view.editor.setSelection(from, to);
     view.editor.scrollIntoView({ from, to }, true);
+  }
+
+  /**
+   * 把笔记滚到图上某个节点对应的那一行，并选中它。focus：要不要把焦点也给编辑器
+   * （点节点跟着滚时不给，焦点留在图上接着按键；右键「在笔记里定位」时给）。
+   */
+  async revealSourceLine(notePath: string, diagramId: string, srcLine: number, focus: boolean): Promise<void> {
+    const leaf = this.app.workspace
+      .getLeavesOfType("markdown")
+      .find((l) => l.view instanceof MarkdownView && l.view.file?.path === notePath);
+    if (!leaf) return;
+    const view = leaf.view as MarkdownView;
+    const ds = diagramSource(view.editor.getValue(), targetOf(diagramId));
+    const line = ds?.lines[srcLine - 1];
+    if (line === undefined) return;
+    if (view.getMode() === "source") {
+      const from = { line, ch: 0 };
+      const to = { line, ch: view.editor.getLine(line).length };
+      view.editor.setSelection(from, to);
+      view.editor.scrollIntoView({ from, to }, true);
+      if (focus) this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    } else {
+      view.previewMode.applyScroll(line); // 阅读模式没有光标，只滚过去
+    }
   }
 
   viewportKey(notePath: string | null, diagramId: string): string {
@@ -811,6 +839,15 @@ export class FlowView extends MarkdownRenderChild {
     if (readonly) this.hintEl = this.stage.createDiv({ cls: "outline-flow-hint" });
     this.updateHints();
 
+    // 右键交给图自己的菜单（cxttap），别再弹出编辑器或系统的右键菜单
+    if (!readonly) {
+      this.stage.addEventListener("contextmenu", (e) => {
+        if ((e.target as HTMLElement).closest("input")) return;
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
+
     // 「图在用」：在这张图的任何地方按下（画布、工具条、弹出的菜单）都算，点到图外面或按 Esc 才退出。
     // 不直接看浏览器的焦点：拖动时 Obsidian 的编辑器会把焦点抢走一下又还回来，跟着焦点走的话边框会闪、滚轮会失灵。
     // 按键还是要焦点：松开时（不在输入框里）把焦点放回画布，点完菜单按钮也能接着按键、滚轮缩放
@@ -888,6 +925,8 @@ export class FlowView extends MarkdownRenderChild {
         this.plugin.pushHistory(this.viewportKey, { kind: "pos", before, after: clonePos(this.data.pos) });
       }
       this.updateRefs();
+      // 吸附会在松手时再挪一下节点：弧线的控制点得按挪好的位置重算，不然还是拖动最后一刻的弯法（对齐了线却不直）
+      this.updateCurves(n.connectedEdges());
       this.updateStatus();
       this.queueSave();
     });
@@ -928,6 +967,19 @@ export class FlowView extends MarkdownRenderChild {
       }
       this.closeLinkMenu();
       if (!readonly) this.select(n);
+      // 侧栏的图：点哪个节点，笔记就滚到哪一行（代码块的图就在笔记里，滚它没有意义）
+      if (!readonly && this.opts.fill && this.notePath && this.plugin.settings.clickToJump && this.selected === n) {
+        void this.plugin.revealSourceLine(this.notePath, this.diagramId, n.data("line"), false);
+      }
+    });
+    // 右键：节点上是这个节点的操作，空白处是整张图的操作（导出的网页里没有）
+    this.cy.on("cxttap", (evt: any) => {
+      if (readonly) return;
+      const oe = evt.originalEvent as MouseEvent | undefined;
+      if (!oe) return;
+      oe.preventDefault();
+      this.focusStage();
+      this.showMenu(evt.target === this.cy ? null : evt.target, oe);
     });
     // 点背景：把菜单收起来、取消选中；图拿到焦点（滚轮、按键从这时起归图管）
     this.cy.on("tap", (evt: any) => {
@@ -1352,9 +1404,17 @@ export class FlowView extends MarkdownRenderChild {
       }
       return; // 别的组合键（复制、粘贴……）不抢
     }
+    const sel = this.selected && !this.selected.removed() ? this.selected : null;
+    // ⌥↑ ⌥↓：和相邻的同级换位置
+    if (e.altKey && !mod && (k === "ArrowUp" || k === "ArrowDown")) {
+      if (!sel) return;
+      handled();
+      if (e.repeat || this.busy || this.editing) return;
+      void this.write({ kind: k === "ArrowUp" ? "moveUp" : "moveDown", line: sel.data("line") });
+      return;
+    }
     if (mod || e.altKey) return;
 
-    const sel = this.selected && !this.selected.removed() ? this.selected : null;
     switch (k) {
       case "Escape":
         handled();
@@ -1385,6 +1445,49 @@ export class FlowView extends MarkdownRenderChild {
         return;
       }
     }
+  }
+
+  // ---------- 右键菜单 ----------
+
+  /** 右键菜单：n 是节点（null 是空白处）。菜单里的操作和按键是同一套 */
+  private showMenu(n: any | null, evt: MouseEvent) {
+    const menu = new Menu();
+    const add = (title: string, icon: string, run: () => void, disabled = false) =>
+      menu.addItem((it) => {
+        it.setTitle(title).setIcon(icon).onClick(run);
+        if (disabled) it.setDisabled(true);
+      });
+    if (n && !n.hasClass("note")) {
+      const editable = this.isEditable(n);
+      if (editable) {
+        this.select(n);
+        const line = () => n.data("line") as number;
+        const idle = () => !this.busy && !this.editing;
+        add(t("menu.addChild"), "corner-down-right", () => idle() && this.startAdd("addChild"));
+        add(t("menu.addSibling"), "plus", () => idle() && this.startAdd("addSibling"));
+        add(t("menu.edit"), "pencil", () => idle() && void this.startText(n));
+        menu.addSeparator();
+        add(t("menu.moveUp"), "arrow-up", () => idle() && void this.write({ kind: "moveUp", line: line() }));
+        add(t("menu.moveDown"), "arrow-down", () => idle() && void this.write({ kind: "moveDown", line: line() }));
+        add(t("menu.promote"), "arrow-left", () => idle() && void this.write({ kind: "promote", line: line() }));
+        menu.addSeparator();
+      }
+      if (n.hasClass("link")) add(t("menu.openLink"), "external-link", () => this.openLinks(n));
+      if (this.notePath && n.data("line")) {
+        const path = this.notePath;
+        add(t("menu.reveal"), "file-search", () => void this.plugin.revealSourceLine(path, this.diagramId, n.data("line"), true));
+      }
+      if (editable) {
+        menu.addSeparator();
+        add(t("menu.remove"), "trash-2", () => !this.busy && !this.editing && void this.write({ kind: "remove", line: n.data("line") }));
+      }
+    } else {
+      add(t("toolbar.fit"), "maximize", () => this.fit());
+      if (this.resetBtn) add(t("toolbar.relayout"), "layout-grid", () => this.resetBtn?.click(), this.resetBtn.disabled);
+      const path = this.notePath;
+      if (path) add(t("toolbar.exportPage"), "download", () => void this.plugin.exportNote(path));
+    }
+    menu.showAtMouseEvent(evt);
   }
 
   // ---------- 选中 ----------
@@ -2305,6 +2408,16 @@ class OutlineFlowSettingTab extends PluginSettingTab {
       .addToggle((tg) => {
         tg.setValue(s.snap).onChange(async (v) => {
           s.snap = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName(t("settings.clickToJump.name"))
+      .setDesc(t("settings.clickToJump.desc"))
+      .addToggle((tg) => {
+        tg.setValue(s.clickToJump).onChange(async (v) => {
+          s.clickToJump = v;
           await this.plugin.saveSettings();
         });
       });

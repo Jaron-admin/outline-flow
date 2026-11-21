@@ -1,6 +1,6 @@
 // FlowView 的冒烟测试：真的把类实例化出来，走 load → update → 出错 → 空 → 恢复。
 // 这块逻辑在 Obsidian 外跑不了，但它正是这轮改动风险最高的地方（销毁重建改成就地更新）。
-import { TFile } from "obsidian";
+import { MarkdownView, TFile } from "obsidian";
 import OutlineFlowPlugin, { FlowView } from "../src/main";
 import { extractOutlineFromMarkdown } from "../src/graph";
 import { applyEdit } from "../src/edit";
@@ -360,7 +360,7 @@ try {
     const pos2 = one.renderedPosition();
     mouse("mousedown", stageEl.querySelector("canvas")!, box.left + pos2.x, box.top + pos2.y);
     mouse("mouseup", window, box.left + pos2.x, box.top + pos2.y);
-    ok("网址：原地单击（没按 ⌘）只是选中，不打开", opened2.length === 0 && (L.v as any).selected === one, JSON.stringify(opened2));
+    ok("网址：原地单击（没按 ⌘）只是选中，不打开", opened2.length === 0 && (L.v as any).selected === one, JSON.stringify(opened2) + " sel=" + (L.v as any).selected?.data("label") + " one=" + one.data("label") + " rm=" + one.removed() + " focus=" + document.activeElement?.className);
     mouse("mousedown", stageEl.querySelector("canvas")!, box.left + pos2.x, box.top + pos2.y, true);
     mouse("mouseup", window, box.left + pos2.x, box.top + pos2.y, true);
     ok("网址：原地 ⌘+单击，才算点击打开", opened2.length === 1, JSON.stringify(opened2));
@@ -499,8 +499,8 @@ try {
     jia.emit("tap");
     ok("编辑：单击节点选中它，有 selected 类", v.selected === jia && jia.hasClass("selected"));
     ok("编辑：选中后图拿到焦点", document.activeElement === stage);
-    ok("编辑：选中后提示行列出按键", keysLine().includes("回车 加同级 · Tab 加下级 · ⇧Tab 提一级 · 空格 改字 · Delete 删除") && keysLine().includes("打开链接"), keysLine());
-    ok("编辑：选中时的描边色来自样式表", jia.style("border-color") !== "" && jia.style("underlay-opacity") > 0, `${jia.style("underlay-opacity")}`);
+    ok("编辑：选中后提示行列出按键", keysLine().includes("回车 加同级 · Tab 加下级 · ⇧Tab 提一级 · ⌥↑↓ 上移下移 · 空格 改字 · Delete 删除") && keysLine().includes("右键 更多"), keysLine());
+    ok("编辑：选中时外面描一圈轮廓线（跟着节点的圆角）", parseFloat(jia.style("outline-width")) > 0, `${jia.style("outline-width")}`);
     byLabel("乙一").emit("tap");
     ok("编辑：选另一个，前一个取消", !jia.hasClass("selected") && v.selected === byLabel("乙一"));
     cy.emit("tap");
@@ -824,6 +824,53 @@ try {
     redraw();
     ok("写笔记：改字后选中它", v.selected?.data("label") === "校验库存");
 
+    // ⌥↑ / ⌥↓：和相邻的同级换位置；已经在头上或末尾时提示
+    byLabel("下单啦").emit("tap");
+    press(stage, { key: "ArrowDown", altKey: true });
+    await sleep(0);
+    ok("写笔记：⌥↓ 已经是最后一个时提示", toastText() === "已经是这一层的最后一个了", toastText());
+    const kids = vaultText.split("\n").filter((l) => l.startsWith("  - ")).map((l) => l.slice(4));
+    if (kids.length >= 2) {
+      byLabel(kids[1]).emit("tap");
+      press(stage, { key: "ArrowUp", altKey: true });
+      await sleep(0);
+      const after = vaultText.split("\n").filter((l) => l.startsWith("  - ")).map((l) => l.slice(4));
+      ok("写笔记：⌥↑ 和上一个同级换位置", after[0] === kids[1] && after[1] === kids[0], JSON.stringify([kids, after]));
+      redraw();
+    } else ok("写笔记：⌥↑ 测试前提（至少两个同级）", false, JSON.stringify(vaultText));
+
+    // 右键菜单：节点上有加下级、删除等；空白处有适应窗口
+    const nodeMenu = () => (globalThis as any).__outlineFlowMenu?.items.map((i: any) => i.title) ?? [];
+    (globalThis as any).__outlineFlowMenu = null;
+    const tgt = byLabel("校验库存");
+    tgt.emit("cxttap", [], { originalEvent: new MouseEvent("contextmenu") });
+    (v as any).showMenu(tgt, new MouseEvent("contextmenu"));
+    ok("右键：节点菜单里有加下级、上移、在笔记里定位、删除", ["加下级", "加同级", "改字", "上移", "下移", "提一级", "在笔记里定位", "删除（连同下级）"].every((x) => nodeMenu().includes(x)), nodeMenu().join(","));
+    ok("右键：右键的节点被选中", v.selected?.data("label") === "校验库存");
+    (v as any).showMenu(null, new MouseEvent("contextmenu"));
+    ok("右键：空白处菜单里有适应窗口、导出网页", nodeMenu().includes("适应窗口") && nodeMenu().includes("导出网页"), nodeMenu().join(","));
+
+    // 点节点跟着滚：找到开着这篇笔记的编辑器，选中节点对应的那一行（不抢焦点）
+    {
+      const calls2: any[] = [];
+      const mv: any = Object.create(MarkdownView.prototype);
+      mv.file = { path: "n.md" };
+      mv.getMode = () => "source";
+      mv.editor = {
+        getValue: () => vaultText,
+        getLine: (l: number) => vaultText.split("\n")[l],
+        setSelection: (a: any, b: any) => calls2.push(["sel", a.line, b.ch]),
+        scrollIntoView: () => calls2.push(["scroll"]),
+      };
+      const realLeaves = fakeApp.workspace.getLeavesOfType;
+      fakeApp.workspace.getLeavesOfType = () => [{ view: mv }];
+      const target = byLabel("校验库存");
+      await plugin.revealSourceLine("n.md", NOTE_ID, target.data("line"), false);
+      const want = vaultText.split("\n").findIndex((l) => l.includes("校验库存"));
+      ok("跟着滚：选中笔记里对应的那一行并滚过去", calls2[0]?.[0] === "sel" && calls2[0][1] === want && calls2.some((c) => c[0] === "scroll"), JSON.stringify(calls2) + " want " + want);
+      fakeApp.workspace.getLeavesOfType = realLeaves;
+    }
+
     // 标题：Delete 整节，不在这个测试里弹 Notice（Obsidian 的 Notice 在网页里是空桩），只看文字
     byLabel("订单").emit("tap");
     press(stage, { key: "Delete" });
@@ -860,7 +907,7 @@ try {
       ok("语言 en：状态行是英文", /nodes, positions are automatic\./.test(status) && !/[\u3400-\u9fff]/.test(status), status);
       cyOf(E.v).nodes().not(".note").first().emit("tap");
       const keys = E.el.querySelector(".outline-flow-keys")?.textContent ?? "";
-      ok("语言 en：选中节点后的按键提示是英文", /^Enter: add sibling · Tab: add child · ⇧Tab: promote · Space: edit text · Delete: remove · (⌘Z|Ctrl\+Z): undo · (⌘|Ctrl)\+click: open link/.test(keys), keys);
+      ok("语言 en：选中节点后的按键提示是英文", /^Enter: add sibling · Tab: add child · ⇧Tab: promote · ⌥↑↓: move up\/down · Space: edit text · Delete: remove · (⌘Z|Ctrl\+Z): undo · Right-click: more/.test(keys), keys);
       E.v.update("");
       ok("语言 en：空内容提示是英文", overlayText(E.el) === "Write a line in the code block and a node will appear here.", overlayText(E.el));
       E.v.unload();
